@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --border: #e4e4e7;
+  --primary: #18181b;
+  --primary-foreground: #fafafa;
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --font-arabic: var(--font-ibm-plex-arabic);
+}
+
+/* Light theme only - no dark mode */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-arabic), Arial, sans-serif;
+  text-align: start;
+  min-height: 100dvh;
+}
+
+/* Utility class for Arabic font */
+.font-arabic {
+  font-family: var(--font-arabic), Arial, sans-serif;
+}
+
+/* RTL-aware focus styles */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Touch-friendly tap target minimum */
+button, a, input, select, textarea {
+  min-height: 44px;
+}
+
+/* ===== Print Styles for PDF Export ===== */
+@media print {
+  /* Hide sidebar, nav, and non-essential UI */
+  aside, nav, header,
+  [data-sidebar], .sidebar,
+  [role="navigation"] {
+    display: none !important;
+  }
+
+  /* Make main content full width */
+  main, [role="main"] {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Remove shadows for clean print */
+  .shadow, .shadow-sm, .shadow-md, .shadow-lg {
+    box-shadow: none !important;
+  }
+
+  /* Ensure cards don't break across pages */
+  .rounded-lg, .rounded-xl, [class*="card"] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Compact spacing */
+  body {
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  /* Ensure colored backgrounds print (charts, progress bars) */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Ensure chart bars and colored elements are visible */
+  [class*="bg-amber"], [class*="bg-pink"], [class*="bg-emerald"],
+  [class*="bg-green"], [class*="bg-red"], [class*="bg-yellow"],
+  [class*="bg-orange"], [class*="bg-blue"] {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Keep chart container dimensions */
+  #student-report-detail {
+    width: 100% !important;
+  }
+
+  /* Page margins */
+  @page {
+    margin: 15mm;
+    size: A4;
+  }
+}
