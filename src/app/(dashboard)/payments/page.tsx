@@ -183,11 +183,11 @@ export default async function PaymentsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-zinc-500">المتوقع هذا الشهر</p>
-              <p className="text-2xl font-bold">{totalExpected.toLocaleString()} ج.م</p>
+              <p className="text-2xl font-bold">{totalExpected.toLocaleString()} TL</p>
             </div>
             <div className="text-left">
               <p className="text-sm text-zinc-500">المحصّل</p>
-              <p className="text-2xl font-bold text-green-600">{totalCollected.toLocaleString()} ج.م</p>
+              <p className="text-2xl font-bold text-green-600">{totalCollected.toLocaleString()} TL</p>
             </div>
           </div>
         </CardContent>
@@ -235,7 +235,7 @@ export default async function PaymentsPage() {
                             {student.name}
                           </Link>
                           <p className="text-sm text-zinc-500">
-                            {info?.feeConfig?.monthlyFee || "غير محدد"} ج.م/شهر
+                            {info?.feeConfig?.monthlyFee || "غير محدد"} TL/شهر
                           </p>
                         </div>
                         {info?.primaryContact?.phone && (
@@ -277,7 +277,7 @@ export default async function PaymentsPage() {
                           {info.student.name}
                         </Link>
                         <p className="text-sm text-zinc-500">
-                          مستحق: {info.feeConfig?.monthlyFee || "0"} ج.م
+                          مستحق: {info.feeConfig?.monthlyFee || "0"} TL
                         </p>
                       </div>
                       <div className="flex gap-2">
@@ -327,7 +327,7 @@ export default async function PaymentsPage() {
                             {info.student.name}
                           </Link>
                           <p className="text-sm text-zinc-500">
-                            مدفوع: {paid} ج.م • متبقي: {remaining} ج.م
+                            مدفوع: {paid} TL • متبقي: {remaining} TL
                           </p>
                         </div>
                         <Button size="sm" asChild>
@@ -374,7 +374,7 @@ export default async function PaymentsPage() {
                       </Link>
                       <div className="flex items-center gap-2 mt-1">
                         <Badge variant="outline" className="text-red-600 border-red-300">
-                          {info.feeConfig?.monthlyFee || "0"} ج.م
+                          {info.feeConfig?.monthlyFee || "0"} TL
                         </Badge>
                         {info.primaryContact?.phone && (
                           <span className="text-xs text-zinc-500" dir="ltr">
@@ -431,7 +431,7 @@ export default async function PaymentsPage() {
                       </p>
                     </div>
                     <div className="text-left">
-                      <p className="font-medium text-green-600">{payment.amount} ج.م</p>
+                      <p className="font-medium text-green-600">{payment.amount} TL</p>
                       <p className="text-xs text-zinc-500">
                         {payment.paymentMethod === "cash" ? "نقدي" : "تحويل"}
                       </p>

@@ -128,16 +128,16 @@ function WebDashboard({ stats }: DashboardContentProps) {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-8">
               <div>
                 <p className="text-sm text-zinc-500 mb-1">المتوقع</p>
-                <p className="text-2xl font-bold">{stats.expectedRevenue.toLocaleString()} ج.م</p>
+                <p className="text-2xl font-bold">{stats.expectedRevenue.toLocaleString()} TL</p>
               </div>
               <div>
                 <p className="text-sm text-zinc-500 mb-1">المحصّل</p>
-                <p className="text-2xl font-bold text-green-600">{stats.collectedRevenue.toLocaleString()} ج.م</p>
+                <p className="text-2xl font-bold text-green-600">{stats.collectedRevenue.toLocaleString()} TL</p>
               </div>
               <div>
                 <p className="text-sm text-zinc-500 mb-1">المتبقي</p>
                 <p className="text-2xl font-bold text-amber-600">
-                  {(stats.expectedRevenue - stats.collectedRevenue).toLocaleString()} ج.م
+                  {(stats.expectedRevenue - stats.collectedRevenue).toLocaleString()} TL
                 </p>
               </div>
             </div>
@@ -239,7 +239,7 @@ function WebDashboard({ stats }: DashboardContentProps) {
                         {item.studentName}
                       </Link>
                       {item.amount && (
-                        <p className="text-sm text-zinc-500">{item.amount} ج.م</p>
+                        <p className="text-sm text-zinc-500">{item.amount} TL</p>
                       )}
                     </div>
                   </div>

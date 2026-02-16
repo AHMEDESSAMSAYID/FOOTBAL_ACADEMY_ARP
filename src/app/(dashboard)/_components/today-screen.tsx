@@ -111,12 +111,12 @@ export function TodayScreen({ stats }: TodayScreenProps) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-zinc-500">المتوقع هذا الشهر</p>
-              <p className="text-lg font-bold">{stats.expectedRevenue.toLocaleString()} ج.م</p>
+              <p className="text-lg font-bold">{stats.expectedRevenue.toLocaleString()} TL</p>
             </div>
             <div className="h-10 w-px bg-zinc-200" />
             <div className="text-left">
               <p className="text-xs text-zinc-500">المحصّل</p>
-              <p className="text-lg font-bold text-green-600">{stats.collectedRevenue.toLocaleString()} ج.م</p>
+              <p className="text-lg font-bold text-green-600">{stats.collectedRevenue.toLocaleString()} TL</p>
             </div>
           </div>
           <div className="mt-3">
@@ -190,8 +190,8 @@ export function TodayScreen({ stats }: TodayScreenProps) {
                   </Link>
                   <p className="text-sm text-zinc-500">
                     {item.type === "blocked" && "محظور"}
-                    {item.type === "overdue" && `متأخر ${item.amount} ج.م`}
-                    {item.type === "partial" && `متبقي ${item.amount} ج.م`}
+                    {item.type === "overdue" && `متأخر ${item.amount} TL`}
+                    {item.type === "partial" && `متبقي ${item.amount} TL`}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">

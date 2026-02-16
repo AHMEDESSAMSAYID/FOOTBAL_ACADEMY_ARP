@@ -159,7 +159,7 @@ export function EditPaymentForm({
 
       {/* Amount */}
       <div className="grid gap-2">
-        <Label htmlFor="amount">المبلغ (ج.م) *</Label>
+        <Label htmlFor="amount">المبلغ (TL) *</Label>
         <Input
           id="amount"
           type="number"
@@ -172,10 +172,10 @@ export function EditPaymentForm({
           required
         />
         {feeConfig && paymentType === "monthly" && (
-          <p className="text-xs text-zinc-500">الاشتراك المحدد: {feeConfig.monthlyFee} ج.م</p>
+          <p className="text-xs text-zinc-500">الاشتراك المحدد: {feeConfig.monthlyFee} TL</p>
         )}
         {feeConfig?.busFee && paymentType === "bus" && (
-          <p className="text-xs text-zinc-500">رسوم الباص المحددة: {feeConfig.busFee} ج.م</p>
+          <p className="text-xs text-zinc-500">رسوم الباص المحددة: {feeConfig.busFee} TL</p>
         )}
       </div>
 
@@ -238,7 +238,7 @@ export function EditPaymentForm({
           {selectedMonths.length > 0 && (
             <p className="text-sm text-blue-600">
               عدد الأشهر: {selectedMonths.length} •
-              المبلغ لكل شهر: {(parseFloat(amount || "0") / selectedMonths.length).toFixed(2)} ج.م
+              المبلغ لكل شهر: {(parseFloat(amount || "0") / selectedMonths.length).toFixed(2)} TL
             </p>
           )}
         </div>

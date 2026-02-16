@@ -93,7 +93,7 @@ export async function PaymentCoverageCalendar({ studentId }: PaymentCoverageCale
       <div>
         <h4 className="font-medium mb-3 flex items-center gap-2">
           الاشتراك الشهري
-          <span className="text-sm font-normal text-zinc-500">({feeConfig.monthlyFee} ج.م/شهر)</span>
+          <span className="text-sm font-normal text-zinc-500">({feeConfig.monthlyFee} TL/شهر)</span>
         </h4>
         <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
           {yearMonths.map((yearMonth) => {
@@ -127,7 +127,7 @@ export async function PaymentCoverageCalendar({ studentId }: PaymentCoverageCale
         <div>
           <h4 className="font-medium mb-3 flex items-center gap-2">
             رسوم الباص
-            <span className="text-sm font-normal text-zinc-500">({feeConfig.busFee} ج.م/شهر)</span>
+            <span className="text-sm font-normal text-zinc-500">({feeConfig.busFee} TL/شهر)</span>
           </h4>
           <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
             {yearMonths.map((yearMonth) => {

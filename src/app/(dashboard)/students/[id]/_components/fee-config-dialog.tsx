@@ -105,7 +105,7 @@ export function FeeConfigDialog({ studentId, existingConfig }: FeeConfigDialogPr
           <div className="grid gap-4 py-4">
             {/* Monthly Fee */}
             <div className="grid gap-2">
-              <Label htmlFor="monthlyFee">الاشتراك الشهري (ج.م) *</Label>
+              <Label htmlFor="monthlyFee">الاشتراك الشهري (TL) *</Label>
               <Input
                 id="monthlyFee"
                 type="number"
@@ -121,7 +121,7 @@ export function FeeConfigDialog({ studentId, existingConfig }: FeeConfigDialogPr
 
             {/* Bus Fee */}
             <div className="grid gap-2">
-              <Label htmlFor="busFee">رسوم الباص (ج.م)</Label>
+              <Label htmlFor="busFee">رسوم الباص (TL)</Label>
               <Input
                 id="busFee"
                 type="number"
@@ -136,7 +136,7 @@ export function FeeConfigDialog({ studentId, existingConfig }: FeeConfigDialogPr
 
             {/* Uniform */}
             <div className="grid gap-2">
-              <Label htmlFor="uniformPrice">سعر الزي الرسمي (ج.م)</Label>
+              <Label htmlFor="uniformPrice">سعر الزي الرسمي (TL)</Label>
               <div className="flex gap-4 items-center">
                 <Input
                   id="uniformPrice"
@@ -183,7 +183,7 @@ export function FeeConfigDialog({ studentId, existingConfig }: FeeConfigDialogPr
 
                   <div className="grid gap-2">
                     <Label htmlFor="discountAmount">
-                      قيمة الخصم {discountType === "percentage" ? "(%)" : "(ج.م)"}
+                      قيمة الخصم {discountType === "percentage" ? "(%)" : "(TL)"}
                     </Label>
                     <Input
                       id="discountAmount"

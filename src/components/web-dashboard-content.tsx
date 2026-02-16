@@ -105,7 +105,7 @@ export function WebDashboardContent() {
                       </div>
                     </td>
                     <td className="p-4 text-sm">تحت ١٢ سنة</td>
-                    <td className="p-4 font-medium">٥٠٠ ج.م</td>
+                    <td className="p-4 font-medium">500 TL</td>
                     <td className="p-4">
                       <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700">
                         ٣٠ يوم
@@ -133,7 +133,7 @@ export function WebDashboardContent() {
                       </div>
                     </td>
                     <td className="p-4 text-sm">تحت ١٤ سنة</td>
-                    <td className="p-4 font-medium">١,٠٠٠ ج.م</td>
+                    <td className="p-4 font-medium">1,000 TL</td>
                     <td className="p-4">
                       <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-700">
                         ٦٠ يوم
@@ -161,7 +161,7 @@ export function WebDashboardContent() {
                       </div>
                     </td>
                     <td className="p-4 text-sm">تحت ١٠ سنة</td>
-                    <td className="p-4 font-medium">٥٠٠ ج.م</td>
+                    <td className="p-4 font-medium">500 TL</td>
                     <td className="p-4">
                       <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700">
                         ١٥ يوم
@@ -219,7 +219,7 @@ export function WebDashboardContent() {
                 <span className="mt-0.5 text-green-500">✓</span>
                 <div>
                   <p className="text-sm font-medium">دفعة جديدة</p>
-                  <p className="text-xs text-zinc-500">أحمد محمود - ٥٠٠ ج.م</p>
+                  <p className="text-xs text-zinc-500">أحمد محمود - 500 TL</p>
                   <p className="text-xs text-zinc-400">منذ ١٠ دقائق</p>
                 </div>
               </div>

@@ -212,12 +212,12 @@ export default async function StudentPage({ params }: StudentPageProps) {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
                       <p className="text-zinc-500">الاشتراك الشهري</p>
-                      <p className="font-medium">{studentFeeConfig[0].monthlyFee} ج.م</p>
+                      <p className="font-medium">{studentFeeConfig[0].monthlyFee} TL</p>
                     </div>
                     {studentFeeConfig[0].busFee && (
                       <div>
                         <p className="text-zinc-500">رسوم الباص</p>
-                        <p className="font-medium">{studentFeeConfig[0].busFee} ج.م</p>
+                        <p className="font-medium">{studentFeeConfig[0].busFee} TL</p>
                       </div>
                     )}
                     <div>
@@ -231,7 +231,7 @@ export default async function StudentPage({ params }: StudentPageProps) {
                         <p className="text-zinc-500">الخصم</p>
                         <p className="font-medium">
                           {studentFeeConfig[0].discountAmount} 
-                          {studentFeeConfig[0].discountType === "percentage" ? "%" : " ج.م"}
+                          {studentFeeConfig[0].discountType === "percentage" ? "%" : " TL"}
                         </p>
                       </div>
                     )}
@@ -296,7 +296,7 @@ export default async function StudentPage({ params }: StudentPageProps) {
                   {studentPayments.map((payment) => (
                     <div key={payment.id} className="flex items-center justify-between p-3 rounded-lg bg-zinc-50">
                       <div>
-                        <p className="font-medium">{payment.amount} ج.م</p>
+                        <p className="font-medium">{payment.amount} TL</p>
                         <p className="text-sm text-zinc-500">
                           {payment.paymentType === "monthly" && "اشتراك شهري"}
                           {payment.paymentType === "bus" && "رسوم الباص"}
@@ -314,7 +314,18 @@ export default async function StudentPage({ params }: StudentPageProps) {
                             {payment.paymentMethod === "cash" ? "نقدي" : "تحويل بنكي"}
                           </p>
                         </div>
-                        <PaymentActions paymentId={payment.id} studentId={id} />
+                        <PaymentActions
+                          paymentId={payment.id}
+                          studentId={id}
+                          studentName={student.name}
+                          membershipNumber={student.membershipNumber || undefined}
+                          amount={payment.amount}
+                          paymentType={payment.paymentType as "monthly" | "bus" | "uniform"}
+                          paymentMethod={payment.paymentMethod as "cash" | "bank_transfer"}
+                          payerName={payment.payerName}
+                          paymentDate={payment.paymentDate}
+                          notes={payment.notes}
+                        />
                       </div>
                     </div>
                   ))}
@@ -360,7 +371,7 @@ export default async function StudentPage({ params }: StudentPageProps) {
                             className="flex items-center justify-between p-2.5 rounded-lg bg-violet-50 border border-violet-100"
                           >
                             <div>
-                              <p className="text-sm font-medium">{payment.amount} ج.م</p>
+                              <p className="text-sm font-medium">{payment.amount} TL</p>
                               <p className="text-xs text-zinc-500">
                                 {payment.paymentType === "monthly" && "اشتراك شهري"}
                                 {payment.paymentType === "bus" && "رسوم الباص"}
@@ -396,15 +407,15 @@ export default async function StudentPage({ params }: StudentPageProps) {
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center text-sm">
                         <div>
                           <p className="text-xs text-zinc-500">{student.name}</p>
-                          <p className="font-bold text-violet-700">{ownTotal.toFixed(0)} ج.م</p>
+                          <p className="font-bold text-violet-700">{ownTotal.toFixed(0)} TL</p>
                         </div>
                         <div>
                           <p className="text-xs text-zinc-500">الأخوة</p>
-                          <p className="font-bold text-violet-700">{sibTotal.toFixed(0)} ج.م</p>
+                          <p className="font-bold text-violet-700">{sibTotal.toFixed(0)} TL</p>
                         </div>
                         <div>
                           <p className="text-xs text-zinc-500">إجمالي العائلة</p>
-                          <p className="font-bold text-violet-900">{(ownTotal + sibTotal).toFixed(0)} ج.م</p>
+                          <p className="font-bold text-violet-900">{(ownTotal + sibTotal).toFixed(0)} TL</p>
                         </div>
                       </div>
                     </div>
