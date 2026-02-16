@@ -2,30 +2,48 @@ import { db } from "@/db";
 import { paymentCoverage, feeConfigs, students } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { Badge } from "@/components/ui/badge";
-import { getBillingInfo, isBeforeRegistration } from "@/lib/billing";
+import { getBillingInfo } from "@/lib/billing";
 
 interface PaymentCoverageCalendarProps {
   studentId: string;
 }
 
-const arabicMonths = [
-  "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
-  "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
-];
+/** Generate 12 billing periods starting from the registration date.
+ *  Each period runs from billingDay of one month to billingDay of the next.
+ *  Returns { yearMonth (for DB lookup), startLabel, endLabel }. */
+function generateBillingPeriods(registrationDate: string) {
+  const regDate = new Date(registrationDate + "T00:00:00");
+  const billingDay = regDate.getDate();
+  const periods: {
+    yearMonth: string;
+    label: string;
+    startDate: Date;
+    endDate: Date;
+  }[] = [];
 
-// Generate months for the current year
-function generateYearMonths(year: number): string[] {
-  const months: string[] = [];
-  for (let month = 1; month <= 12; month++) {
-    months.push(`${year}-${String(month).padStart(2, "0")}`);
+  for (let i = 0; i < 12; i++) {
+    // Start of period i
+    const startMonth = new Date(regDate.getFullYear(), regDate.getMonth() + i, 1);
+    const daysInStart = new Date(startMonth.getFullYear(), startMonth.getMonth() + 1, 0).getDate();
+    const effectiveStart = Math.min(billingDay, daysInStart);
+    const start = new Date(startMonth.getFullYear(), startMonth.getMonth(), effectiveStart);
+
+    // End of period = day before start of next period
+    const nextMonth = new Date(regDate.getFullYear(), regDate.getMonth() + i + 1, 1);
+    const daysInNext = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
+    const effectiveNext = Math.min(billingDay, daysInNext);
+    const end = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), effectiveNext - 1);
+
+    const yearMonth = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`;
+    const label = `${start.getDate()}/${start.getMonth() + 1} - ${end.getDate()}/${end.getMonth() + 1}`;
+
+    periods.push({ yearMonth, label, startDate: start, endDate: end });
   }
-  return months;
+
+  return periods;
 }
 
 export async function PaymentCoverageCalendar({ studentId }: PaymentCoverageCalendarProps) {
-  const currentYear = new Date().getFullYear();
-  const yearMonths = generateYearMonths(currentYear);
-  
   // Fetch student for registration date
   const student = await db.query.students.findFirst({
     where: eq(students.id, studentId),
@@ -42,9 +60,9 @@ export async function PaymentCoverageCalendar({ studentId }: PaymentCoverageCale
     .from(paymentCoverage)
     .where(eq(paymentCoverage.studentId, studentId));
 
-  // Use registration-based billing info
-  const registrationDate = student?.registrationDate || `${currentYear}-01-01`;
+  const registrationDate = student?.registrationDate || `${new Date().getFullYear()}-01-01`;
   const billing = getBillingInfo(registrationDate);
+  const periods = generateBillingPeriods(registrationDate);
 
   // Build coverage map
   const coverageMap = new Map<string, { monthly?: typeof coverage[0]; bus?: typeof coverage[0] }>();
@@ -58,10 +76,12 @@ export async function PaymentCoverageCalendar({ studentId }: PaymentCoverageCale
     coverageMap.set(c.yearMonth, existing);
   }
 
-  const getStatusStyle = (status: string | undefined, isFuture: boolean, isPreRegistration: boolean) => {
-    if (isPreRegistration) return "bg-zinc-50 text-zinc-300";
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const getStatusStyle = (status: string | undefined, isFuture: boolean) => {
     if (isFuture) return "bg-zinc-100 text-zinc-400";
-    if (!status) return "bg-red-100 text-red-700"; // No coverage = overdue
+    if (!status) return "bg-red-100 text-red-700";
     switch (status) {
       case "paid":
         return "bg-green-100 text-green-700";
@@ -74,8 +94,7 @@ export async function PaymentCoverageCalendar({ studentId }: PaymentCoverageCale
     }
   };
 
-  const getStatusLabel = (status: string | undefined, isFuture: boolean, isPreRegistration: boolean) => {
-    if (isPreRegistration) return "—";
+  const getStatusLabel = (status: string | undefined, isFuture: boolean) => {
     if (isFuture) return "قادم";
     if (!status) return "غير مدفوع";
     switch (status) {
@@ -100,29 +119,27 @@ export async function PaymentCoverageCalendar({ studentId }: PaymentCoverageCale
 
   return (
     <div className="space-y-4">
-      {/* Monthly Subscription Calendar */}
+      {/* Monthly Subscription - Billing Periods */}
       <div>
         <h4 className="font-medium mb-3 flex items-center gap-2">
           الاشتراك الشهري
           <span className="text-sm font-normal text-zinc-500">({feeConfig.monthlyFee} TL/شهر • يوم الفوترة: {billing.billingDay})</span>
         </h4>
-        <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
-          {yearMonths.map((yearMonth) => {
-            const monthIndex = parseInt(yearMonth.split("-")[1]) - 1;
-            const isPreRegistration = isBeforeRegistration(yearMonth, registrationDate);
-            const isFuture = yearMonth > billing.currentDueYearMonth && !isPreRegistration;
-            const isCurrent = yearMonth === billing.currentDueYearMonth;
-            const monthCoverage = coverageMap.get(yearMonth)?.monthly;
+        <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+          {periods.map((period) => {
+            const isFuture = period.yearMonth > billing.currentDueYearMonth;
+            const isCurrent = period.yearMonth === billing.currentDueYearMonth;
+            const monthCoverage = coverageMap.get(period.yearMonth)?.monthly;
             
             return (
               <div 
-                key={yearMonth}
+                key={period.yearMonth}
                 className={`p-3 rounded-lg text-center transition-colors ${
-                  getStatusStyle(monthCoverage?.status, isFuture, isPreRegistration)
+                  getStatusStyle(monthCoverage?.status, isFuture)
                 } ${isCurrent ? "ring-2 ring-blue-500" : ""}`}
               >
-                <p className="text-xs font-medium">{arabicMonths[monthIndex]}</p>
-                <p className="text-[10px] mt-1">{getStatusLabel(monthCoverage?.status, isFuture, isPreRegistration)}</p>
+                <p className="text-xs font-medium" dir="ltr">{period.label}</p>
+                <p className="text-[10px] mt-1">{getStatusLabel(monthCoverage?.status, isFuture)}</p>
                 {monthCoverage && monthCoverage.status === "partial" && (
                   <p className="text-[10px]">
                     {monthCoverage.amountPaid}/{monthCoverage.amountDue}
@@ -134,30 +151,28 @@ export async function PaymentCoverageCalendar({ studentId }: PaymentCoverageCale
         </div>
       </div>
 
-      {/* Bus Fee Calendar (if applicable) */}
+      {/* Bus Fee - Billing Periods */}
       {feeConfig.busFee && (
         <div>
           <h4 className="font-medium mb-3 flex items-center gap-2">
             رسوم الباص
             <span className="text-sm font-normal text-zinc-500">({feeConfig.busFee} TL/شهر)</span>
           </h4>
-          <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
-            {yearMonths.map((yearMonth) => {
-              const monthIndex = parseInt(yearMonth.split("-")[1]) - 1;
-              const isPreRegistration = isBeforeRegistration(yearMonth, registrationDate);
-              const isFuture = yearMonth > billing.currentDueYearMonth && !isPreRegistration;
-              const isCurrent = yearMonth === billing.currentDueYearMonth;
-              const busCoverage = coverageMap.get(yearMonth)?.bus;
+          <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+            {periods.map((period) => {
+              const isFuture = period.yearMonth > billing.currentDueYearMonth;
+              const isCurrent = period.yearMonth === billing.currentDueYearMonth;
+              const busCoverage = coverageMap.get(period.yearMonth)?.bus;
               
               return (
                 <div 
-                  key={yearMonth}
+                  key={period.yearMonth}
                   className={`p-3 rounded-lg text-center transition-colors ${
-                    getStatusStyle(busCoverage?.status, isFuture, isPreRegistration)
+                    getStatusStyle(busCoverage?.status, isFuture)
                   } ${isCurrent ? "ring-2 ring-blue-500" : ""}`}
                 >
-                  <p className="text-xs font-medium">{arabicMonths[monthIndex]}</p>
-                  <p className="text-[10px] mt-1">{getStatusLabel(busCoverage?.status, isFuture, isPreRegistration)}</p>
+                  <p className="text-xs font-medium" dir="ltr">{period.label}</p>
+                  <p className="text-[10px] mt-1">{getStatusLabel(busCoverage?.status, isFuture)}</p>
                 </div>
               );
             })}

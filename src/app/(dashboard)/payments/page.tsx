@@ -106,7 +106,7 @@ export default async function PaymentsPage() {
   const studentsWithConfig = Array.from(studentPaymentMap.values()).filter(s => s.feeConfig);
   const paidStudents = studentsWithConfig.filter(s => s.status === "paid");
   const partialStudents = studentsWithConfig.filter(s => s.status === "partial");
-  const overdueStudents = studentsWithConfig.filter(s => s.status === "overdue");
+  const overdueStudents = studentsWithConfig.filter(s => s.status === "overdue" && s.student.status === "active");
   const blockedStudents = allStudents.filter(s => s.status === "frozen");
 
   // Calculate totals
