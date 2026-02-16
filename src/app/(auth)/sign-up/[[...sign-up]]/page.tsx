@@ -9,10 +9,10 @@ export default function SignUpPage() {
         <div>
           <h1 className="text-2xl font-bold">أكاديمية إسبانيول</h1>
           <p className="mt-2 text-zinc-600">
-            إنشاء حساب جديد
+            إنشاء حسابك بالدعوة
           </p>
         </div>
-        <SignUp 
+        <SignUp
           appearance={{
             elements: {
               rootBox: "mx-auto",

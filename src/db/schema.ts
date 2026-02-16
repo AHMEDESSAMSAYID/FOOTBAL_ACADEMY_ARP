@@ -154,7 +154,7 @@ export const userRoleEnum = pgEnum('user_role', [
 // Users table (Clerk-synced system users)
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
-  clerkId: varchar('clerk_id', { length: 255 }).notNull().unique(),
+  clerkId: varchar('clerk_id', { length: 255 }).unique(),
   name: varchar('name', { length: 100 }).notNull(),
   email: varchar('email', { length: 255 }).notNull(),
   phone: varchar('phone', { length: 20 }),

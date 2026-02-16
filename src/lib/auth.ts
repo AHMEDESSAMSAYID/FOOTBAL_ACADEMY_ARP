@@ -6,9 +6,12 @@ import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
+// Core admin email — auto-created as admin on first sign-in
+const CORE_ADMIN_EMAIL = "espanyolacademy10@gmail.com";
+
 /**
  * Get the current user's role from the database.
- * Creates the user record on first sign-in (defaults to admin).
+ * Only the core admin email auto-creates. Everyone else must be pre-invited.
  */
 export async function getCurrentUserRole(): Promise<{
   role: "admin" | "coach";
@@ -20,6 +23,8 @@ export async function getCurrentUserRole(): Promise<{
   if (!clerk) {
     redirect("/sign-in");
   }
+
+  const email = clerk.emailAddresses[0]?.emailAddress || "";
 
   // Look up user in DB
   const existing = await db
@@ -37,22 +42,50 @@ export async function getCurrentUserRole(): Promise<{
     };
   }
 
-  // First sign-in: create user record (defaults to admin)
-  const [newUser] = await db
-    .insert(users)
-    .values({
-      clerkId: clerk.id,
-      name: clerk.firstName || clerk.emailAddresses[0]?.emailAddress || "User",
-      email: clerk.emailAddresses[0]?.emailAddress || "",
-      phone: clerk.phoneNumbers[0]?.phoneNumber || null,
-      role: "admin",
-    })
-    .returning();
+  // Only the core admin can auto-create on first sign-in
+  if (email.toLowerCase() === CORE_ADMIN_EMAIL) {
+    const [newUser] = await db
+      .insert(users)
+      .values({
+        clerkId: clerk.id,
+        name: clerk.firstName || email,
+        email,
+        phone: clerk.phoneNumbers[0]?.phoneNumber || null,
+        role: "admin",
+      })
+      .returning();
 
-  return {
-    role: newUser.role as "admin" | "coach",
-    userId: newUser.id,
-    clerkId: clerk.id,
-    userName: newUser.name,
-  };
+    return {
+      role: newUser.role as "admin" | "coach",
+      userId: newUser.id,
+      clerkId: clerk.id,
+      userName: newUser.name,
+    };
+  }
+
+  // Check if the user was pre-created by email (invited by admin via createCoach/createAdmin)
+  const preCreated = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, email))
+    .limit(1);
+
+  if (preCreated.length > 0 && !preCreated[0].clerkId) {
+    // Link the Clerk account to the pre-created DB record
+    const [updated] = await db
+      .update(users)
+      .set({ clerkId: clerk.id })
+      .where(eq(users.id, preCreated[0].id))
+      .returning();
+
+    return {
+      role: updated.role as "admin" | "coach",
+      userId: updated.id,
+      clerkId: clerk.id,
+      userName: updated.name,
+    };
+  }
+
+  // Not invited — deny access
+  redirect("/sign-in?error=not-invited");
 }

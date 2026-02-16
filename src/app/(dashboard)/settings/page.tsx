@@ -17,12 +17,13 @@ export default async function SettingsPage() {
       coaches={
         usersResult.success && usersResult.users
           ? usersResult.users
-              .filter((u) => u.role === "coach")
+              .filter((u) => u.email !== "espanyolacademy10@gmail.com") // hide core admin from list
               .map((u) => ({
                 id: u.id,
                 name: u.name,
                 email: u.email,
                 phone: u.phone,
+                role: u.role,
                 isActive: u.isActive,
                 createdAt: u.createdAt,
               }))

@@ -21,6 +21,7 @@ interface EditPaymentFormProps {
   studentId: string;
   studentName: string;
   paymentId: string;
+  registrationDate: string;
   feeConfig?: {
     monthlyFee: string;
     busFee: string | null;
@@ -36,30 +37,37 @@ interface EditPaymentFormProps {
   };
 }
 
-// Generate months for selection range (wider for editing old payments)
-function generateMonths(): { value: string; label: string }[] {
-  const months = [];
-  const now = new Date();
-  const arabicMonths = [
-    "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
-    "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
-  ];
+// Generate billing-cycle periods based on student registration date
+function generateBillingPeriods(registrationDate: string): { value: string; label: string }[] {
+  const regDate = new Date(registrationDate + "T00:00:00");
+  const billingDay = regDate.getDate();
+  const periods: { value: string; label: string }[] = [];
 
-  // Show from 6 months back to 12 months forward
+  // Wider range for editing old payments
   for (let i = -6; i < 12; i++) {
-    const date = new Date(now.getFullYear(), now.getMonth() + i, 1);
-    const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-    const label = `${arabicMonths[date.getMonth()]} ${date.getFullYear()}`;
-    months.push({ value, label });
+    const startMonth = new Date(regDate.getFullYear(), regDate.getMonth() + i, 1);
+    const daysInStart = new Date(startMonth.getFullYear(), startMonth.getMonth() + 1, 0).getDate();
+    const effectiveStart = Math.min(billingDay, daysInStart);
+    const start = new Date(startMonth.getFullYear(), startMonth.getMonth(), effectiveStart);
+
+    const nextMonth = new Date(regDate.getFullYear(), regDate.getMonth() + i + 1, 1);
+    const daysInNext = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
+    const effectiveNext = Math.min(billingDay, daysInNext);
+    const end = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), effectiveNext - 1);
+
+    const value = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`;
+    const label = `${start.getDate()}/${start.getMonth() + 1} - ${end.getDate()}/${end.getMonth() + 1}`;
+    periods.push({ value, label });
   }
 
-  return months;
+  return periods;
 }
 
 export function EditPaymentForm({
   studentId,
   studentName,
   paymentId,
+  registrationDate,
   feeConfig,
   initialData,
 }: EditPaymentFormProps) {
@@ -74,18 +82,26 @@ export function EditPaymentForm({
   const [paymentDate, setPaymentDate] = useState(initialData.paymentDate);
   const [selectedMonths, setSelectedMonths] = useState<string[]>(initialData.coveredMonths);
 
-  const months = generateMonths();
+  const months = generateBillingPeriods(registrationDate);
 
   // Also add any covered months from initialData that aren't in the range
   const allMonths = [...months];
   for (const ym of initialData.coveredMonths) {
     if (!allMonths.find((m) => m.value === ym)) {
-      const [y, m] = ym.split("-");
-      const arabicMonths = [
-        "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
-        "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
-      ];
-      allMonths.push({ value: ym, label: `${arabicMonths[parseInt(m) - 1]} ${y}` });
+      // Generate the label for this period based on registration date
+      const regDate = new Date(registrationDate + "T00:00:00");
+      const billingDay = regDate.getDate();
+      const [y, mo] = ym.split("-").map(Number);
+      const startMonth = new Date(y, mo - 1, 1);
+      const daysInStart = new Date(startMonth.getFullYear(), startMonth.getMonth() + 1, 0).getDate();
+      const effectiveStart = Math.min(billingDay, daysInStart);
+      const start = new Date(startMonth.getFullYear(), startMonth.getMonth(), effectiveStart);
+      const nextMonth = new Date(y, mo, 1);
+      const daysInNext = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
+      const effectiveNext = Math.min(billingDay, daysInNext);
+      const end = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), effectiveNext - 1);
+      const label = `${start.getDate()}/${start.getMonth() + 1} - ${end.getDate()}/${end.getMonth() + 1}`;
+      allMonths.push({ value: ym, label });
     }
   }
   allMonths.sort((a, b) => a.value.localeCompare(b.value));

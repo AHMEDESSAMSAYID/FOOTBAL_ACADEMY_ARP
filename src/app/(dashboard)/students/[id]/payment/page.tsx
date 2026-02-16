@@ -77,6 +77,7 @@ export default async function PaymentPage({ params }: PaymentPageProps) {
           <PaymentForm 
             studentId={id} 
             studentName={student.name}
+            registrationDate={student.registrationDate}
             feeConfig={feeConfig ? {
               monthlyFee: feeConfig.monthlyFee,
               busFee: feeConfig.busFee,

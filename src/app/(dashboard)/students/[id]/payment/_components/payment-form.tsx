@@ -30,6 +30,7 @@ interface SiblingInfo {
 interface PaymentFormProps {
   studentId: string;
   studentName: string;
+  registrationDate: string;
   feeConfig?: {
     monthlyFee: string;
     busFee: string | null;
@@ -37,26 +38,32 @@ interface PaymentFormProps {
   siblings?: SiblingInfo[];
 }
 
-// Generate months for the next 12 months
-function generateMonths(): { value: string; label: string }[] {
-  const months = [];
-  const now = new Date();
-  const arabicMonths = [
-    "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
-    "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
-  ];
-  
+// Generate billing-cycle periods based on student registration date
+function generateBillingPeriods(registrationDate: string): { value: string; label: string }[] {
+  const regDate = new Date(registrationDate + "T00:00:00");
+  const billingDay = regDate.getDate();
+  const periods: { value: string; label: string }[] = [];
+
   for (let i = -2; i < 12; i++) {
-    const date = new Date(now.getFullYear(), now.getMonth() + i, 1);
-    const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-    const label = `${arabicMonths[date.getMonth()]} ${date.getFullYear()}`;
-    months.push({ value, label });
+    const startMonth = new Date(regDate.getFullYear(), regDate.getMonth() + i, 1);
+    const daysInStart = new Date(startMonth.getFullYear(), startMonth.getMonth() + 1, 0).getDate();
+    const effectiveStart = Math.min(billingDay, daysInStart);
+    const start = new Date(startMonth.getFullYear(), startMonth.getMonth(), effectiveStart);
+
+    const nextMonth = new Date(regDate.getFullYear(), regDate.getMonth() + i + 1, 1);
+    const daysInNext = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
+    const effectiveNext = Math.min(billingDay, daysInNext);
+    const end = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), effectiveNext - 1);
+
+    const value = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`;
+    const label = `${start.getDate()}/${start.getMonth() + 1} - ${end.getDate()}/${end.getMonth() + 1}`;
+    periods.push({ value, label });
   }
-  
-  return months;
+
+  return periods;
 }
 
-export function PaymentForm({ studentId, studentName, feeConfig, siblings = [] }: PaymentFormProps) {
+export function PaymentForm({ studentId, studentName, registrationDate, feeConfig, siblings = [] }: PaymentFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   
@@ -69,7 +76,7 @@ export function PaymentForm({ studentId, studentName, feeConfig, siblings = [] }
   const [sendSmsNotification, setSendSmsNotification] = useState(false);
   const [alsoPayForSiblings, setAlsoPayForSiblings] = useState<string[]>([]);
   
-  const months = generateMonths();
+  const months = generateBillingPeriods(registrationDate);
 
   // Update amount when payment type changes
   const handlePaymentTypeChange = (type: "monthly" | "bus" | "uniform") => {

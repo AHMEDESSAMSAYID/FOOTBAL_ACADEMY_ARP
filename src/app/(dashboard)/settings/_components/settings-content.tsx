@@ -15,6 +15,13 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   Download, 
   Activity, 
@@ -42,6 +49,7 @@ interface Coach {
   name: string;
   email: string;
   phone: string | null;
+  role: string;
   isActive: boolean;
   createdAt: Date;
 }
@@ -103,7 +111,7 @@ export function SettingsContent({ stats, recentLogs, coaches: initialCoaches, us
   const [isPending, startTransition] = useTransition();
   const [coaches, setCoaches] = useState<Coach[]>(initialCoaches);
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [newCoach, setNewCoach] = useState({ name: "", email: "", password: "", phone: "" });
+  const [newCoach, setNewCoach] = useState({ name: "", email: "", phone: "", role: "coach" as "admin" | "coach" });
 
   function handleExport(type: "students" | "payments" | "leads") {
     startTransition(async () => {
@@ -130,33 +138,35 @@ export function SettingsContent({ stats, recentLogs, coaches: initialCoaches, us
   }
 
   function handleAddCoach() {
-    if (!newCoach.name || !newCoach.email || !newCoach.password) {
+    if (!newCoach.name || !newCoach.email) {
       toast.error("يرجى ملء جميع الحقول المطلوبة");
       return;
     }
-    if (newCoach.password.length < 8) {
-      toast.error("كلمة المرور يجب أن تكون 8 أحرف على الأقل");
-      return;
-    }
     startTransition(async () => {
-      const result = await createCoach(newCoach);
-      if (result.success && result.coach) {
-        setCoaches((prev) => [
-          ...prev,
-          {
-            id: result.coach!.id,
-            name: result.coach!.name,
-            email: result.coach!.email,
-            phone: result.coach!.phone,
-            isActive: result.coach!.isActive,
-            createdAt: result.coach!.createdAt,
-          },
-        ]);
-        setNewCoach({ name: "", email: "", password: "", phone: "" });
-        setShowAddDialog(false);
-        toast.success("تم إنشاء حساب المدرب بنجاح");
-      } else {
-        toast.error(result.error || "فشل في إنشاء الحساب");
+      try {
+        const result = await createCoach({ ...newCoach, role: newCoach.role });
+        if (result.success && result.coach) {
+          setCoaches((prev) => [
+            ...prev,
+            {
+              id: result.coach!.id,
+              name: result.coach!.name,
+              email: result.coach!.email,
+              phone: result.coach!.phone,
+              role: result.coach!.role,
+              isActive: result.coach!.isActive,
+              createdAt: result.coach!.createdAt,
+            },
+          ]);
+          setNewCoach({ name: "", email: "", phone: "", role: "coach" });
+          setShowAddDialog(false);
+          toast.success("تم إرسال الدعوة بنجاح — سيصل بريد إلكتروني للمستخدم");
+        } else {
+          toast.error(result.error || "فشل في إنشاء الحساب");
+        }
+      } catch (err) {
+        toast.error("حدث خطأ غير متوقع أثناء إنشاء الحساب");
+        console.error(err);
       }
     });
   }
@@ -202,7 +212,7 @@ export function SettingsContent({ stats, recentLogs, coaches: initialCoaches, us
           {userRole === "admin" && (
             <TabsTrigger value="coaches">
               <Users className="h-4 w-4 ms-2" />
-              المدربين
+              المستخدمين
             </TabsTrigger>
           )}
           <TabsTrigger value="exports">
@@ -227,32 +237,44 @@ export function SettingsContent({ stats, recentLogs, coaches: initialCoaches, us
                 <div>
                   <CardTitle className="text-base flex items-center gap-2">
                     <Users className="h-5 w-5 text-blue-600" />
-                    إدارة المدربين
+                    إدارة المستخدمين
                   </CardTitle>
                   <CardDescription>
-                    إضافة وإدارة حسابات المدربين — المدرب يرى فقط: التقييمات، تقارير الأداء، الحضور
+                    إضافة وإدارة حسابات المدربين والمديرين — المدرب يرى فقط: التقييمات، تقارير الأداء، الحضور
                   </CardDescription>
                 </div>
                 <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
                   <DialogTrigger asChild>
                     <Button size="sm">
                       <UserPlus className="h-4 w-4 ms-2" />
-                      إضافة مدرب
+                      إضافة مستخدم
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-md" dir="rtl">
                     <DialogHeader>
-                      <DialogTitle>إضافة مدرب جديد</DialogTitle>
+                      <DialogTitle>دعوة مستخدم جديد</DialogTitle>
                       <DialogDescription>
-                        سيتم إنشاء حساب للمدرب مع صلاحيات محدودة
+                        سيتم إرسال رابط دعوة عبر البريد الإلكتروني لإنشاء حسابه
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                       <div className="space-y-2">
+                        <Label htmlFor="coach-role">الدور *</Label>
+                        <Select value={newCoach.role} onValueChange={(v) => setNewCoach((p) => ({ ...p, role: v as "admin" | "coach" }))}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">مدير</SelectItem>
+                            <SelectItem value="coach">مدرب</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
                         <Label htmlFor="coach-name">الاسم *</Label>
                         <Input
                           id="coach-name"
-                          placeholder="اسم المدرب"
+                          placeholder="اسم المستخدم"
                           value={newCoach.name}
                           onChange={(e) => setNewCoach((p) => ({ ...p, name: e.target.value }))}
                         />
@@ -262,21 +284,10 @@ export function SettingsContent({ stats, recentLogs, coaches: initialCoaches, us
                         <Input
                           id="coach-email"
                           type="email"
-                          placeholder="coach@example.com"
+                          placeholder="user@example.com"
                           dir="ltr"
                           value={newCoach.email}
                           onChange={(e) => setNewCoach((p) => ({ ...p, email: e.target.value }))}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="coach-password">كلمة المرور *</Label>
-                        <Input
-                          id="coach-password"
-                          type="password"
-                          placeholder="8 أحرف على الأقل"
-                          dir="ltr"
-                          value={newCoach.password}
-                          onChange={(e) => setNewCoach((p) => ({ ...p, password: e.target.value }))}
                         />
                       </div>
                       <div className="space-y-2">
@@ -293,7 +304,7 @@ export function SettingsContent({ stats, recentLogs, coaches: initialCoaches, us
                     </div>
                     <DialogFooter>
                       <Button onClick={handleAddCoach} disabled={isPending}>
-                        {isPending ? "جارٍ الإنشاء..." : "إنشاء حساب المدرب"}
+                        {isPending ? "جارٍ الإرسال..." : "إرسال دعوة"}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
@@ -303,8 +314,8 @@ export function SettingsContent({ stats, recentLogs, coaches: initialCoaches, us
                 {coaches.length === 0 ? (
                   <div className="text-center py-8 text-zinc-500">
                     <Users className="h-12 w-12 mx-auto mb-3 text-zinc-300" />
-                    <p>لا يوجد مدربين بعد</p>
-                    <p className="text-sm">اضغط &quot;إضافة مدرب&quot; لإنشاء أول حساب</p>
+                    <p>لا يوجد مستخدمين بعد</p>
+                    <p className="text-sm">اضغط &quot;إضافة مستخدم&quot; لدعوة مدير أو مدرب</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -314,11 +325,18 @@ export function SettingsContent({ stats, recentLogs, coaches: initialCoaches, us
                         className="flex items-center justify-between p-4 rounded-lg bg-zinc-50 border border-zinc-100"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-700 font-bold text-sm">
+                          <div className={`flex h-10 w-10 items-center justify-center rounded-full font-bold text-sm ${
+                            coach.role === "admin" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"
+                          }`}>
                             {coach.name.charAt(0)}
                           </div>
                           <div>
-                            <p className="font-medium">{coach.name}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">{coach.name}</p>
+                              <Badge variant={coach.role === "admin" ? "default" : "outline"} className="text-xs">
+                                {coach.role === "admin" ? "مدير" : "مدرب"}
+                              </Badge>
+                            </div>
                             <p className="text-sm text-zinc-500" dir="ltr">{coach.email}</p>
                             {coach.phone && (
                               <p className="text-xs text-zinc-400" dir="ltr">{coach.phone}</p>

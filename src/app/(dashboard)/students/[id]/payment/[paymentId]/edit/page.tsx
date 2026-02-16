@@ -64,6 +64,7 @@ export default async function EditPaymentPage({ params }: EditPaymentPageProps) 
             studentId={id}
             studentName={student.name}
             paymentId={paymentId}
+            registrationDate={student.registrationDate}
             feeConfig={feeConfig ? {
               monthlyFee: feeConfig.monthlyFee,
               busFee: feeConfig.busFee,

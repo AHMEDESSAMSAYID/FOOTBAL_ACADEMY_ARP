@@ -3,12 +3,17 @@ import { NextResponse } from 'next/server';
 
 const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
-  '/sign-up(.*)',
-  '/survey(.*)',
 ]);
 
+const isSignUpRoute = createRouteMatcher(['/sign-up(.*)']);
+
 export default clerkMiddleware(async (auth, request) => {
-  if (!isPublicRoute(request)) {
+  // Allow sign-up only with invitation ticket, redirect all others to sign-in
+  if (isSignUpRoute(request) && !request.nextUrl.searchParams.has('__clerk_ticket')) {
+    return NextResponse.redirect(new URL('/sign-in', request.url));
+  }
+
+  if (!isPublicRoute(request) && !isSignUpRoute(request)) {
     await auth.protect();
   }
 
