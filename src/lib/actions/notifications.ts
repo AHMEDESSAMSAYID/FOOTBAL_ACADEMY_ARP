@@ -12,6 +12,7 @@ import {
 import { eq, and, desc, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { sendSms } from "@/lib/sms";
+import { getBillingInfo } from "@/lib/billing";
 
 // ===== Notification Channel Config =====
 
@@ -108,11 +109,6 @@ export async function sendPaymentConfirmation(studentId: string, amount: string,
 
 // ===== Escalation Engine =====
 
-function getCurrentYearMonth(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-}
-
 export interface EscalationResult {
   processed: number;
   reminders: number;
@@ -131,18 +127,15 @@ export async function runEscalationCheck(): Promise<EscalationResult> {
   };
 
   try {
-    const currentYearMonth = getCurrentYearMonth();
-
     // Get all active students with fee configs
     const allStudents = await db.select().from(students)
       .where(eq(students.status, "active"));
 
     const allFeeConfigs = await db.select().from(feeConfigs);
-    const allCoverage = await db.select().from(paymentCoverage)
-      .where(eq(paymentCoverage.yearMonth, currentYearMonth));
+    const allCoverage = await db.select().from(paymentCoverage);
     const allContacts = await db.select().from(contacts);
 
-    // Get existing escalation logs for this month (unresolved)
+    // Get existing escalation logs (unresolved)
     const existingEscalations = await db.select().from(escalationLogs)
       .where(isNull(escalationLogs.resolvedAt));
 
@@ -150,8 +143,11 @@ export async function runEscalationCheck(): Promise<EscalationResult> {
       const feeConfig = allFeeConfigs.find(fc => fc.studentId === student.id);
       if (!feeConfig) continue;
 
+      // Use registration-based billing cycle
+      const billing = getBillingInfo(student.registrationDate);
+      
       const coverage = allCoverage.find(
-        c => c.studentId === student.id && c.feeType === "monthly"
+        c => c.studentId === student.id && c.feeType === "monthly" && c.yearMonth === billing.currentDueYearMonth
       );
 
       const monthlyFee = parseFloat(feeConfig.monthlyFee);
@@ -168,9 +164,8 @@ export async function runEscalationCheck(): Promise<EscalationResult> {
         continue;
       }
 
-      // Calculate days overdue (assuming due on 1st of month)
-      const now = new Date();
-      const daysOverdue = now.getDate(); // simplified: days into the month
+      // Use billing-based days overdue instead of calendar day
+      const daysOverdue = billing.daysSinceDue;
 
       const primaryContact = allContacts.find(
         c => c.studentId === student.id && c.isPrimaryPayer
@@ -195,7 +190,7 @@ export async function runEscalationCheck(): Promise<EscalationResult> {
       } else {
         level = "reminder";
         notificationType = "payment_reminder";
-        content = `📋 تذكير: دفعة شهر ${currentYearMonth} مستحقة للطالب ${student.name}.`;
+        content = `📋 تذكير: دفعة فترة ${billing.currentDueYearMonth} مستحقة للطالب ${student.name}.`;
         result.reminders++;
       }
 

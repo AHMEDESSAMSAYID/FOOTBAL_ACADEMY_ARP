@@ -1,7 +1,8 @@
 import { db } from "@/db";
-import { paymentCoverage, feeConfigs } from "@/db/schema";
+import { paymentCoverage, feeConfigs, students } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { Badge } from "@/components/ui/badge";
+import { getBillingInfo, isBeforeRegistration } from "@/lib/billing";
 
 interface PaymentCoverageCalendarProps {
   studentId: string;
@@ -23,9 +24,13 @@ function generateYearMonths(year: number): string[] {
 
 export async function PaymentCoverageCalendar({ studentId }: PaymentCoverageCalendarProps) {
   const currentYear = new Date().getFullYear();
-  const currentYearMonth = `${currentYear}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
   const yearMonths = generateYearMonths(currentYear);
   
+  // Fetch student for registration date
+  const student = await db.query.students.findFirst({
+    where: eq(students.id, studentId),
+  });
+
   // Fetch fee config
   const feeConfig = await db.query.feeConfigs.findFirst({
     where: eq(feeConfigs.studentId, studentId),
@@ -36,6 +41,10 @@ export async function PaymentCoverageCalendar({ studentId }: PaymentCoverageCale
     .select()
     .from(paymentCoverage)
     .where(eq(paymentCoverage.studentId, studentId));
+
+  // Use registration-based billing info
+  const registrationDate = student?.registrationDate || `${currentYear}-01-01`;
+  const billing = getBillingInfo(registrationDate);
 
   // Build coverage map
   const coverageMap = new Map<string, { monthly?: typeof coverage[0]; bus?: typeof coverage[0] }>();
@@ -49,7 +58,8 @@ export async function PaymentCoverageCalendar({ studentId }: PaymentCoverageCale
     coverageMap.set(c.yearMonth, existing);
   }
 
-  const getStatusStyle = (status: string | undefined, isFuture: boolean) => {
+  const getStatusStyle = (status: string | undefined, isFuture: boolean, isPreRegistration: boolean) => {
+    if (isPreRegistration) return "bg-zinc-50 text-zinc-300";
     if (isFuture) return "bg-zinc-100 text-zinc-400";
     if (!status) return "bg-red-100 text-red-700"; // No coverage = overdue
     switch (status) {
@@ -64,7 +74,8 @@ export async function PaymentCoverageCalendar({ studentId }: PaymentCoverageCale
     }
   };
 
-  const getStatusLabel = (status: string | undefined, isFuture: boolean) => {
+  const getStatusLabel = (status: string | undefined, isFuture: boolean, isPreRegistration: boolean) => {
+    if (isPreRegistration) return "—";
     if (isFuture) return "قادم";
     if (!status) return "غير مدفوع";
     switch (status) {
@@ -93,24 +104,25 @@ export async function PaymentCoverageCalendar({ studentId }: PaymentCoverageCale
       <div>
         <h4 className="font-medium mb-3 flex items-center gap-2">
           الاشتراك الشهري
-          <span className="text-sm font-normal text-zinc-500">({feeConfig.monthlyFee} TL/شهر)</span>
+          <span className="text-sm font-normal text-zinc-500">({feeConfig.monthlyFee} TL/شهر • يوم الفوترة: {billing.billingDay})</span>
         </h4>
         <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
           {yearMonths.map((yearMonth) => {
             const monthIndex = parseInt(yearMonth.split("-")[1]) - 1;
-            const isFuture = yearMonth > currentYearMonth;
-            const isCurrent = yearMonth === currentYearMonth;
+            const isPreRegistration = isBeforeRegistration(yearMonth, registrationDate);
+            const isFuture = yearMonth > billing.currentDueYearMonth && !isPreRegistration;
+            const isCurrent = yearMonth === billing.currentDueYearMonth;
             const monthCoverage = coverageMap.get(yearMonth)?.monthly;
             
             return (
               <div 
                 key={yearMonth}
                 className={`p-3 rounded-lg text-center transition-colors ${
-                  getStatusStyle(monthCoverage?.status, isFuture)
+                  getStatusStyle(monthCoverage?.status, isFuture, isPreRegistration)
                 } ${isCurrent ? "ring-2 ring-blue-500" : ""}`}
               >
                 <p className="text-xs font-medium">{arabicMonths[monthIndex]}</p>
-                <p className="text-[10px] mt-1">{getStatusLabel(monthCoverage?.status, isFuture)}</p>
+                <p className="text-[10px] mt-1">{getStatusLabel(monthCoverage?.status, isFuture, isPreRegistration)}</p>
                 {monthCoverage && monthCoverage.status === "partial" && (
                   <p className="text-[10px]">
                     {monthCoverage.amountPaid}/{monthCoverage.amountDue}
@@ -132,19 +144,20 @@ export async function PaymentCoverageCalendar({ studentId }: PaymentCoverageCale
           <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
             {yearMonths.map((yearMonth) => {
               const monthIndex = parseInt(yearMonth.split("-")[1]) - 1;
-              const isFuture = yearMonth > currentYearMonth;
-              const isCurrent = yearMonth === currentYearMonth;
+              const isPreRegistration = isBeforeRegistration(yearMonth, registrationDate);
+              const isFuture = yearMonth > billing.currentDueYearMonth && !isPreRegistration;
+              const isCurrent = yearMonth === billing.currentDueYearMonth;
               const busCoverage = coverageMap.get(yearMonth)?.bus;
               
               return (
                 <div 
                   key={yearMonth}
                   className={`p-3 rounded-lg text-center transition-colors ${
-                    getStatusStyle(busCoverage?.status, isFuture)
+                    getStatusStyle(busCoverage?.status, isFuture, isPreRegistration)
                   } ${isCurrent ? "ring-2 ring-blue-500" : ""}`}
                 >
                   <p className="text-xs font-medium">{arabicMonths[monthIndex]}</p>
-                  <p className="text-[10px] mt-1">{getStatusLabel(busCoverage?.status, isFuture)}</p>
+                  <p className="text-[10px] mt-1">{getStatusLabel(busCoverage?.status, isFuture, isPreRegistration)}</p>
                 </div>
               );
             })}

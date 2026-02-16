@@ -139,6 +139,11 @@ export const skillCategoryEnum = pgEnum('skill_category', [
   'teamwork'
 ]);
 
+export const userRoleEnum = pgEnum('user_role', [
+  'admin',
+  'coach'
+]);
+
 // ===== TABLES =====
 
 // Users table (Clerk-synced system users)
@@ -148,6 +153,7 @@ export const users = pgTable('users', {
   name: varchar('name', { length: 100 }).notNull(),
   email: varchar('email', { length: 255 }).notNull(),
   phone: varchar('phone', { length: 20 }),
+  role: userRoleEnum('role').default('admin').notNull(),
   isActive: boolean('is_active').default(true).notNull(),
   lastLogin: timestamp('last_login'),
   createdAt: timestamp('created_at').defaultNow().notNull(),

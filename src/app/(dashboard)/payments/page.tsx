@@ -14,27 +14,17 @@ import {
   TrendingUp,
   DollarSign
 } from "lucide-react";
-
-// Get current month in YYYY-MM format
-function getCurrentYearMonth(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-}
+import { getBillingInfo } from "@/lib/billing";
 
 export default async function PaymentsPage() {
-  const currentYearMonth = getCurrentYearMonth();
-  
   // Fetch all students with their fee configs and coverage status
   const allStudents = await db.select().from(students).orderBy(students.name);
   
   // Fetch all fee configs
   const allFeeConfigs = await db.select().from(feeConfigs);
   
-  // Fetch current month coverage status for all students
-  const currentMonthCoverage = await db
-    .select()
-    .from(paymentCoverage)
-    .where(eq(paymentCoverage.yearMonth, currentYearMonth));
+  // Fetch ALL coverage (we need different months per student based on registration date)
+  const allCoverage = await db.select().from(paymentCoverage);
 
   // Fetch recent payments
   const recentPayments = await db
@@ -50,41 +40,55 @@ export default async function PaymentsPage() {
   // Fetch all contacts for quick dial
   const allContacts = await db.select().from(contacts);
 
-  // Build student payment status
+  // Build student payment status using per-student billing cycles
   const studentPaymentMap = new Map<string, {
     student: typeof allStudents[0];
     feeConfig: typeof allFeeConfigs[0] | undefined;
-    monthlyCoverage: typeof currentMonthCoverage[0] | undefined;
-    busCoverage: typeof currentMonthCoverage[0] | undefined;
+    monthlyCoverage: typeof allCoverage[0] | undefined;
+    busCoverage: typeof allCoverage[0] | undefined;
     primaryContact: typeof allContacts[0] | undefined;
     status: "paid" | "partial" | "overdue" | "no-config";
+    daysInfo: string;
   }>();
 
   for (const student of allStudents) {
     const feeConfig = allFeeConfigs.find(fc => fc.studentId === student.id);
-    const monthlyCoverage = currentMonthCoverage.find(
-      c => c.studentId === student.id && c.feeType === "monthly"
-    );
-    const busCoverage = currentMonthCoverage.find(
-      c => c.studentId === student.id && c.feeType === "bus"
-    );
     const primaryContact = allContacts.find(
       c => c.studentId === student.id && c.isPrimaryPayer
     ) || allContacts.find(c => c.studentId === student.id);
 
     let status: "paid" | "partial" | "overdue" | "no-config" = "no-config";
+    let monthlyCoverage: typeof allCoverage[0] | undefined;
+    let busCoverage: typeof allCoverage[0] | undefined;
+    let daysInfo = "";
+
     if (feeConfig) {
+      // Use registration-based billing cycle
+      const billing = getBillingInfo(student.registrationDate);
+      
+      monthlyCoverage = allCoverage.find(
+        c => c.studentId === student.id && c.feeType === "monthly" && c.yearMonth === billing.currentDueYearMonth
+      );
+      busCoverage = allCoverage.find(
+        c => c.studentId === student.id && c.feeType === "bus" && c.yearMonth === billing.currentDueYearMonth
+      );
+
       if (monthlyCoverage) {
         if (monthlyCoverage.status === "paid") {
           status = "paid";
+          if (billing.daysUntilNextDue > 0) {
+            daysInfo = `${billing.daysUntilNextDue} يوم متبقي`;
+          }
         } else if (monthlyCoverage.status === "partial") {
           status = "partial";
         } else {
           status = "overdue";
+          daysInfo = `متأخر ${billing.daysSinceDue} يوم`;
         }
       } else {
-        // No coverage record means unpaid
+        // No coverage for current due period = overdue
         status = "overdue";
+        daysInfo = `متأخر ${billing.daysSinceDue} يوم`;
       }
     }
 
@@ -95,6 +99,7 @@ export default async function PaymentsPage() {
       busCoverage,
       primaryContact,
       status,
+      daysInfo,
     });
   }
 
@@ -262,7 +267,7 @@ export default async function PaymentsPage() {
                   ⚠️ متأخر ({overdueStudents.length})
                 </CardTitle>
                 <CardDescription>
-                  لم يتم سداد اشتراك الشهر الحالي
+                  لم يتم سداد اشتراك الفترة الحالية
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -276,9 +281,16 @@ export default async function PaymentsPage() {
                         <Link href={`/students/${info.student.id}`} className="font-medium hover:underline">
                           {info.student.name}
                         </Link>
-                        <p className="text-sm text-zinc-500">
-                          مستحق: {info.feeConfig?.monthlyFee || "0"} TL
-                        </p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p className="text-sm text-zinc-500">
+                            مستحق: {info.feeConfig?.monthlyFee || "0"} TL
+                          </p>
+                          {info.daysInfo && (
+                            <Badge variant="outline" className="text-red-600 border-red-300 text-[10px]">
+                              {info.daysInfo}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         {info.primaryContact?.phone && (
@@ -376,6 +388,11 @@ export default async function PaymentsPage() {
                         <Badge variant="outline" className="text-red-600 border-red-300">
                           {info.feeConfig?.monthlyFee || "0"} TL
                         </Badge>
+                        {info.daysInfo && (
+                          <Badge variant="outline" className="text-orange-600 border-orange-300 text-[10px]">
+                            {info.daysInfo}
+                          </Badge>
+                        )}
                         {info.primaryContact?.phone && (
                           <span className="text-xs text-zinc-500" dir="ltr">
                             {info.primaryContact.phone}

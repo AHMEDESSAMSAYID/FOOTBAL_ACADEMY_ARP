@@ -4,6 +4,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { 
   Download, 
   Activity, 
@@ -15,11 +26,25 @@ import {
   UserPlus,
   Calendar,
   Settings,
-  Shield
+  Shield,
+  Trash2,
+  ToggleLeft,
+  ToggleRight,
 } from "lucide-react";
 import { exportStudentsData, exportPaymentsData, exportLeadsData } from "@/lib/actions/exports";
+import { createCoach, deleteCoach, toggleCoachStatus } from "@/lib/actions/users";
 import { toast } from "sonner";
 import { useState, useTransition } from "react";
+import type { UserRole } from "@/lib/auth-utils";
+
+interface Coach {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  isActive: boolean;
+  createdAt: Date;
+}
 
 interface SettingsContentProps {
   stats: {
@@ -35,6 +60,8 @@ interface SettingsContentProps {
     details: unknown;
     createdAt: Date;
   }[];
+  coaches: Coach[];
+  userRole: UserRole;
 }
 
 const actionTypeLabels: Record<string, string> = {
@@ -72,8 +99,11 @@ function downloadCsv(data: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-export function SettingsContent({ stats, recentLogs }: SettingsContentProps) {
+export function SettingsContent({ stats, recentLogs, coaches: initialCoaches, userRole }: SettingsContentProps) {
   const [isPending, startTransition] = useTransition();
+  const [coaches, setCoaches] = useState<Coach[]>(initialCoaches);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [newCoach, setNewCoach] = useState({ name: "", email: "", password: "", phone: "" });
 
   function handleExport(type: "students" | "payments" | "leads") {
     startTransition(async () => {
@@ -99,6 +129,67 @@ export function SettingsContent({ stats, recentLogs }: SettingsContentProps) {
     });
   }
 
+  function handleAddCoach() {
+    if (!newCoach.name || !newCoach.email || !newCoach.password) {
+      toast.error("يرجى ملء جميع الحقول المطلوبة");
+      return;
+    }
+    if (newCoach.password.length < 8) {
+      toast.error("كلمة المرور يجب أن تكون 8 أحرف على الأقل");
+      return;
+    }
+    startTransition(async () => {
+      const result = await createCoach(newCoach);
+      if (result.success && result.coach) {
+        setCoaches((prev) => [
+          ...prev,
+          {
+            id: result.coach!.id,
+            name: result.coach!.name,
+            email: result.coach!.email,
+            phone: result.coach!.phone,
+            isActive: result.coach!.isActive,
+            createdAt: result.coach!.createdAt,
+          },
+        ]);
+        setNewCoach({ name: "", email: "", password: "", phone: "" });
+        setShowAddDialog(false);
+        toast.success("تم إنشاء حساب المدرب بنجاح");
+      } else {
+        toast.error(result.error || "فشل في إنشاء الحساب");
+      }
+    });
+  }
+
+  function handleDeleteCoach(coachId: string) {
+    if (!confirm("هل أنت متأكد من حذف هذا المدرب؟")) return;
+    startTransition(async () => {
+      const result = await deleteCoach(coachId);
+      if (result.success) {
+        setCoaches((prev) => prev.filter((c) => c.id !== coachId));
+        toast.success("تم حذف المدرب بنجاح");
+      } else {
+        toast.error(result.error || "فشل في الحذف");
+      }
+    });
+  }
+
+  function handleToggleCoach(coachId: string) {
+    startTransition(async () => {
+      const result = await toggleCoachStatus(coachId);
+      if (result.success && result.user) {
+        setCoaches((prev) =>
+          prev.map((c) =>
+            c.id === coachId ? { ...c, isActive: result.user!.isActive } : c
+          )
+        );
+        toast.success(result.user.isActive ? "تم تفعيل المدرب" : "تم تعطيل المدرب");
+      } else {
+        toast.error(result.error || "فشل في تغيير الحالة");
+      }
+    });
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -106,8 +197,14 @@ export function SettingsContent({ stats, recentLogs }: SettingsContentProps) {
         <p className="text-zinc-500">إدارة النظام، تصدير البيانات، وسجل النشاطات</p>
       </div>
 
-      <Tabs defaultValue="exports" className="space-y-4">
+      <Tabs defaultValue={userRole === "admin" ? "coaches" : "exports"} className="space-y-4">
         <TabsList className="w-full overflow-x-auto flex-nowrap justify-start">
+          {userRole === "admin" && (
+            <TabsTrigger value="coaches">
+              <Users className="h-4 w-4 ms-2" />
+              المدربين
+            </TabsTrigger>
+          )}
           <TabsTrigger value="exports">
             <FileSpreadsheet className="h-4 w-4 ms-2" />
             تصدير البيانات
@@ -121,6 +218,148 @@ export function SettingsContent({ stats, recentLogs }: SettingsContentProps) {
             الإشعارات
           </TabsTrigger>
         </TabsList>
+
+        {/* Coaches Management Tab */}
+        {userRole === "admin" && (
+          <TabsContent value="coaches" className="space-y-4">
+            <Card className="bg-white">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Users className="h-5 w-5 text-blue-600" />
+                    إدارة المدربين
+                  </CardTitle>
+                  <CardDescription>
+                    إضافة وإدارة حسابات المدربين — المدرب يرى فقط: التقييمات، تقارير الأداء، الحضور
+                  </CardDescription>
+                </div>
+                <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+                  <DialogTrigger asChild>
+                    <Button size="sm">
+                      <UserPlus className="h-4 w-4 ms-2" />
+                      إضافة مدرب
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md" dir="rtl">
+                    <DialogHeader>
+                      <DialogTitle>إضافة مدرب جديد</DialogTitle>
+                      <DialogDescription>
+                        سيتم إنشاء حساب للمدرب مع صلاحيات محدودة
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="coach-name">الاسم *</Label>
+                        <Input
+                          id="coach-name"
+                          placeholder="اسم المدرب"
+                          value={newCoach.name}
+                          onChange={(e) => setNewCoach((p) => ({ ...p, name: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="coach-email">البريد الإلكتروني *</Label>
+                        <Input
+                          id="coach-email"
+                          type="email"
+                          placeholder="coach@example.com"
+                          dir="ltr"
+                          value={newCoach.email}
+                          onChange={(e) => setNewCoach((p) => ({ ...p, email: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="coach-password">كلمة المرور *</Label>
+                        <Input
+                          id="coach-password"
+                          type="password"
+                          placeholder="8 أحرف على الأقل"
+                          dir="ltr"
+                          value={newCoach.password}
+                          onChange={(e) => setNewCoach((p) => ({ ...p, password: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="coach-phone">الهاتف</Label>
+                        <Input
+                          id="coach-phone"
+                          type="tel"
+                          placeholder="+90..."
+                          dir="ltr"
+                          value={newCoach.phone}
+                          onChange={(e) => setNewCoach((p) => ({ ...p, phone: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button onClick={handleAddCoach} disabled={isPending}>
+                        {isPending ? "جارٍ الإنشاء..." : "إنشاء حساب المدرب"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent>
+                {coaches.length === 0 ? (
+                  <div className="text-center py-8 text-zinc-500">
+                    <Users className="h-12 w-12 mx-auto mb-3 text-zinc-300" />
+                    <p>لا يوجد مدربين بعد</p>
+                    <p className="text-sm">اضغط &quot;إضافة مدرب&quot; لإنشاء أول حساب</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {coaches.map((coach) => (
+                      <div
+                        key={coach.id}
+                        className="flex items-center justify-between p-4 rounded-lg bg-zinc-50 border border-zinc-100"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-700 font-bold text-sm">
+                            {coach.name.charAt(0)}
+                          </div>
+                          <div>
+                            <p className="font-medium">{coach.name}</p>
+                            <p className="text-sm text-zinc-500" dir="ltr">{coach.email}</p>
+                            {coach.phone && (
+                              <p className="text-xs text-zinc-400" dir="ltr">{coach.phone}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={coach.isActive ? "default" : "secondary"}>
+                            {coach.isActive ? "نشط" : "معطل"}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleToggleCoach(coach.id)}
+                            disabled={isPending}
+                            title={coach.isActive ? "تعطيل" : "تفعيل"}
+                          >
+                            {coach.isActive ? (
+                              <ToggleRight className="h-4 w-4 text-green-600" />
+                            ) : (
+                              <ToggleLeft className="h-4 w-4 text-zinc-400" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteCoach(coach.id)}
+                            disabled={isPending}
+                            title="حذف"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
         {/* Exports Tab */}
         <TabsContent value="exports" className="space-y-4">

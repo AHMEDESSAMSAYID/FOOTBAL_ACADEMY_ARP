@@ -3,29 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { getNavItemsForRole } from "@/lib/auth-utils";
+import type { UserRole } from "@/lib/auth-utils";
 
-const mainNavItems = [
-  { href: "/", label: "لوحة التحكم", icon: "📊" },
-  { href: "/students", label: "اللاعبين", icon: "👥" },
-  { href: "/payments", label: "المدفوعات", icon: "💰" },
-  { href: "/crm", label: "العملاء المحتملين", icon: "📋" },
-];
+interface WebSidebarProps {
+  userRole: UserRole;
+}
 
-const secondaryNavItems = [
-  { href: "/evaluations", label: "تقييم المدرب", icon: "⭐" },
-  { href: "/student-reports", label: "تقارير الأداء", icon: "📊" },
-  { href: "/reports", label: "التقارير", icon: "📈" },
-  { href: "/attendance", label: "الحضور", icon: "✅" },
-  { href: "/groups", label: "المجموعات", icon: "🏆" },
-];
-
-const settingsNavItems = [
-  { href: "/settings", label: "الإعدادات", icon: "⚙️" },
-  { href: "/help", label: "المساعدة", icon: "❓" },
-];
-
-export function WebSidebar() {
+export function WebSidebar({ userRole }: WebSidebarProps) {
   const pathname = usePathname();
+  const { mainNavItems, secondaryNavItems, settingsNavItems } = getNavItemsForRole(userRole);
 
   const NavLink = ({ item }: { item: { href: string; label: string; icon: string } }) => (
     <Link
@@ -57,32 +44,38 @@ export function WebSidebar() {
 
       {/* Main Navigation */}
       <nav className="flex-1 space-y-6 overflow-y-auto p-4">
-        <div className="space-y-1">
-          <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-zinc-400">
-            الرئيسية
-          </p>
-          {mainNavItems.map((item) => (
-            <NavLink key={item.href} item={item} />
-          ))}
-        </div>
+        {mainNavItems.length > 0 && (
+          <div className="space-y-1">
+            <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+              الرئيسية
+            </p>
+            {mainNavItems.map((item) => (
+              <NavLink key={item.href} item={item} />
+            ))}
+          </div>
+        )}
 
-        <div className="space-y-1">
-          <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-zinc-400">
-            الإدارة
-          </p>
-          {secondaryNavItems.map((item) => (
-            <NavLink key={item.href} item={item} />
-          ))}
-        </div>
+        {secondaryNavItems.length > 0 && (
+          <div className="space-y-1">
+            <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+              {userRole === "coach" ? "صفحاتي" : "الإدارة"}
+            </p>
+            {secondaryNavItems.map((item) => (
+              <NavLink key={item.href} item={item} />
+            ))}
+          </div>
+        )}
 
-        <div className="space-y-1">
-          <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-zinc-400">
-            النظام
-          </p>
-          {settingsNavItems.map((item) => (
-            <NavLink key={item.href} item={item} />
-          ))}
-        </div>
+        {settingsNavItems.length > 0 && (
+          <div className="space-y-1">
+            <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+              النظام
+            </p>
+            {settingsNavItems.map((item) => (
+              <NavLink key={item.href} item={item} />
+            ))}
+          </div>
+        )}
       </nav>
 
       {/* Quick Stats Footer */}

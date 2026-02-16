@@ -6,13 +6,16 @@ import { LayoutSwitcher } from "@/components/layout-switcher";
 import { WebSidebar } from "@/components/web-sidebar";
 import { WebHeader } from "@/components/web-header";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
+import { RouteGuard } from "@/components/route-guard";
+import type { UserRole } from "@/lib/auth-utils";
 
 interface DashboardShellProps {
   children: React.ReactNode;
   userName: string;
+  userRole: UserRole;
 }
 
-function DashboardContent({ children, userName }: DashboardShellProps) {
+function DashboardContent({ children, userName, userRole }: DashboardShellProps) {
   const { layout, isHydrated } = useLayout();
   
   // Show loading state until hydrated to prevent mismatch
@@ -52,7 +55,7 @@ function DashboardContent({ children, userName }: DashboardShellProps) {
       <div className="min-h-screen bg-zinc-100">
         {/* Fixed Sidebar — hidden below lg */}
         <div className="hidden lg:block">
-          <WebSidebar />
+          <WebSidebar userRole={userRole} />
         </div>
         
         {/* Main Area (shifted for sidebar on lg+) */}
@@ -62,7 +65,9 @@ function DashboardContent({ children, userName }: DashboardShellProps) {
           
           {/* Content Area — less padding on smaller screens */}
           <main className="pt-20 p-4 md:p-6 lg:p-8">
-            {children}
+            <RouteGuard userRole={userRole}>
+              {children}
+            </RouteGuard>
           </main>
         </div>
       </div>
@@ -102,19 +107,21 @@ function DashboardContent({ children, userName }: DashboardShellProps) {
 
       {/* Main Content */}
       <main className="flex-1 pb-20">
-        {children}
+        <RouteGuard userRole={userRole}>
+          {children}
+        </RouteGuard>
       </main>
 
       {/* Mobile Bottom Nav */}
-      <MobileBottomNav />
+      <MobileBottomNav userRole={userRole} />
     </div>
   );
 }
 
-export function DashboardShell({ children, userName }: DashboardShellProps) {
+export function DashboardShell({ children, userName, userRole }: DashboardShellProps) {
   return (
     <LayoutProvider>
-      <DashboardContent userName={userName}>
+      <DashboardContent userName={userName} userRole={userRole}>
         {children}
       </DashboardContent>
     </LayoutProvider>

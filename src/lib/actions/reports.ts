@@ -3,11 +3,7 @@
 import { db } from "@/db";
 import { students, payments, paymentCoverage, feeConfigs, attendance, trainingSessions, leads } from "@/db/schema";
 import { eq, and, desc, gte, lte, sql, count } from "drizzle-orm";
-
-function getCurrentYearMonth(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-}
+import { getBillingInfo } from "@/lib/billing";
 
 function getMonthName(yearMonth: string): string {
   const [year, month] = yearMonth.split("-");
@@ -48,7 +44,8 @@ export interface ReportsData {
 
 export async function getReportsData(): Promise<{ success: boolean; data?: ReportsData; error?: string }> {
   try {
-    const currentYearMonth = getCurrentYearMonth();
+    const now = new Date();
+    const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
     // Fetch all data in parallel
     const [
@@ -98,7 +95,6 @@ export async function getReportsData(): Promise<{ success: boolean; data?: Repor
 
     // === REVENUE STATS ===
     // Get last 6 months coverage data
-    const now = new Date();
     const monthlyRevenue: ReportsData["monthlyRevenue"] = [];
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -178,8 +174,11 @@ export async function getReportsData(): Promise<{ success: boolean; data?: Repor
     for (const student of allStudents.filter(s => s.status === "active")) {
       const fc = allFeeConfigs.find(f => f.studentId === student.id);
       if (!fc) continue;
+      
+      // Use registration-based billing cycle
+      const billing = getBillingInfo(student.registrationDate);
       const coverage = allCoverage.find(
-        c => c.studentId === student.id && c.yearMonth === currentYearMonth && c.feeType === "monthly"
+        c => c.studentId === student.id && c.yearMonth === billing.currentDueYearMonth && c.feeType === "monthly"
       );
       if (!coverage || coverage.status === "overdue" || coverage.status === "pending") {
         overdueStudents.push({

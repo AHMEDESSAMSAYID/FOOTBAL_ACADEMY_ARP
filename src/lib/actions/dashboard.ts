@@ -3,12 +3,7 @@
 import { db } from "@/db";
 import { students, payments, paymentCoverage, feeConfigs, leads, contacts } from "@/db/schema";
 import { eq, sql, and, count, desc } from "drizzle-orm";
-
-// Get current month in YYYY-MM format
-function getCurrentYearMonth(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-}
+import { getBillingInfo } from "@/lib/billing";
 
 export interface DashboardStats {
   // Student counts
@@ -43,19 +38,14 @@ export interface DashboardStats {
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
-  const currentYearMonth = getCurrentYearMonth();
-  
   // Fetch all students
   const allStudents = await db.select().from(students);
   
   // Fetch all fee configs
   const allFeeConfigs = await db.select().from(feeConfigs);
   
-  // Fetch current month coverage
-  const currentMonthCoverage = await db
-    .select()
-    .from(paymentCoverage)
-    .where(eq(paymentCoverage.yearMonth, currentYearMonth));
+  // Fetch ALL coverage (we need different months per student)
+  const allCoverage = await db.select().from(paymentCoverage);
   
   // Fetch all contacts for phone numbers
   const allContacts = await db.select().from(contacts);
@@ -69,7 +59,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const trialStudents = allStudents.filter(s => s.status === "trial").length;
   const frozenStudents = allStudents.filter(s => s.status === "frozen").length;
   
-  // Calculate payment stats
+  // Calculate payment stats using per-student billing cycles
   const studentsWithConfig = allStudents.filter(s => 
     allFeeConfigs.some(fc => fc.studentId === s.id)
   );
@@ -84,15 +74,18 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   
   for (const student of studentsWithConfig) {
     const feeConfig = allFeeConfigs.find(fc => fc.studentId === student.id);
-    const monthlyCoverage = currentMonthCoverage.find(
-      c => c.studentId === student.id && c.feeType === "monthly"
-    );
     const primaryContact = allContacts.find(
       c => c.studentId === student.id && c.isPrimaryPayer
     ) || allContacts.find(c => c.studentId === student.id);
     
     const monthlyFee = parseFloat(feeConfig?.monthlyFee || "0");
     expectedRevenue += monthlyFee;
+
+    // Use registration-based billing cycle
+    const billing = getBillingInfo(student.registrationDate);
+    const monthlyCoverage = allCoverage.find(
+      c => c.studentId === student.id && c.feeType === "monthly" && c.yearMonth === billing.currentDueYearMonth
+    );
     
     if (monthlyCoverage) {
       const amountPaid = parseFloat(monthlyCoverage.amountPaid);
@@ -116,19 +109,19 @@ export async function getDashboardStats(): Promise<DashboardStats> {
           studentName: student.name,
           type: "overdue",
           amount: monthlyFee,
-          daysOverdue: Math.floor((Date.now() - new Date().setDate(1)) / (1000 * 60 * 60 * 24)),
+          daysOverdue: billing.daysSinceDue,
           phone: primaryContact?.phone,
         });
       }
     } else {
-      // No coverage = overdue
+      // No coverage for current due period = overdue
       overdueCount++;
       needsAttention.push({
         studentId: student.id,
         studentName: student.name,
         type: "overdue",
         amount: monthlyFee,
-        daysOverdue: Math.floor((Date.now() - new Date().setDate(1)) / (1000 * 60 * 60 * 24)),
+        daysOverdue: billing.daysSinceDue,
         phone: primaryContact?.phone,
       });
     }
