@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { students, payments, paymentCoverage, feeConfigs, contacts } from "@/db/schema";
+import { students, payments, paymentCoverage, feeConfigs, contacts, uniformRecords } from "@/db/schema";
 import { eq, desc, sql, and } from "drizzle-orm";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,8 @@ import {
   CheckCircle2, 
   Phone,
   TrendingUp,
-  DollarSign
+  DollarSign,
+  Shirt
 } from "lucide-react";
 import { getBillingInfo } from "@/lib/billing";
 
@@ -39,6 +40,40 @@ export default async function PaymentsPage() {
 
   // Fetch all contacts for quick dial
   const allContacts = await db.select().from(contacts);
+
+  // Fetch all uniform records
+  const allUniformRecords = await db.select().from(uniformRecords);
+
+  // Build per-student uniform status map
+  const studentUniformMap = new Map<string, {
+    hasRedUniform: boolean;
+    hasNavyUniform: boolean;
+    unpaidRed: number;
+    unpaidNavy: number;
+    totalRecords: number;
+  }>();
+
+  for (const student of allStudents) {
+    const records = allUniformRecords.filter(r => r.studentId === student.id);
+    const redRecords = records.filter(r => r.uniformType === "red");
+    const navyRecords = records.filter(r => r.uniformType === "navy");
+    studentUniformMap.set(student.id, {
+      hasRedUniform: redRecords.length > 0,
+      hasNavyUniform: navyRecords.length > 0,
+      unpaidRed: redRecords.filter(r => !r.isPaid).length,
+      unpaidNavy: navyRecords.filter(r => !r.isPaid).length,
+      totalRecords: records.length,
+    });
+  }
+
+  // Unpaid red uniforms for attention tab alert
+  const unpaidRedUniforms = allUniformRecords
+    .filter(r => r.uniformType === "red" && !r.isPaid)
+    .map(r => ({
+      uniform: r,
+      student: allStudents.find(s => s.id === r.studentId)!,
+    }))
+    .filter(item => item.student);
 
   // Build student payment status using per-student billing cycles
   const studentPaymentMap = new Map<string, {
@@ -203,9 +238,9 @@ export default async function PaymentsPage() {
         <TabsList>
           <TabsTrigger value="attention" className="relative">
             يحتاج متابعة
-            {(overdueStudents.length + partialStudents.length + blockedStudents.length) > 0 && (
+            {(overdueStudents.length + partialStudents.length + blockedStudents.length + unpaidRedUniforms.length) > 0 && (
               <span className="absolute -top-1 -left-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
-                {overdueStudents.length + partialStudents.length + blockedStudents.length}
+                {overdueStudents.length + partialStudents.length + blockedStudents.length + unpaidRedUniforms.length}
               </span>
             )}
           </TabsTrigger>
@@ -281,7 +316,7 @@ export default async function PaymentsPage() {
                         <Link href={`/students/${info.student.id}`} className="font-medium hover:underline">
                           {info.student.name}
                         </Link>
-                        <div className="flex items-center gap-2 mt-0.5">
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                           <p className="text-sm text-zinc-500">
                             مستحق: {info.feeConfig?.monthlyFee || "0"} TL
                           </p>
@@ -290,6 +325,26 @@ export default async function PaymentsPage() {
                               {info.daysInfo}
                             </Badge>
                           )}
+                          {(() => {
+                            const uInfo = studentUniformMap.get(info.student.id);
+                            if (!uInfo || !uInfo.hasRedUniform) {
+                              return (
+                                <Badge variant="outline" className="text-zinc-500 border-zinc-300 text-[10px]">
+                                  <Shirt className="h-3 w-3 ml-1" />
+                                  بدون زي
+                                </Badge>
+                              );
+                            }
+                            if (uInfo.unpaidRed > 0) {
+                              return (
+                                <Badge variant="destructive" className="text-[10px]">
+                                  <Shirt className="h-3 w-3 ml-1" />
+                                  زي غير مدفوع ({uInfo.unpaidRed})
+                                </Badge>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -353,7 +408,44 @@ export default async function PaymentsPage() {
             </Card>
           )}
 
-          {overdueStudents.length === 0 && partialStudents.length === 0 && blockedStudents.length === 0 && (
+          {unpaidRedUniforms.length > 0 && (
+            <Card className="border-red-300 bg-red-50">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <Shirt className="h-5 w-5 text-red-600" />
+                  <CardTitle className="text-lg text-red-700">
+                    زي أحمر غير مدفوع ({unpaidRedUniforms.length})
+                  </CardTitle>
+                </div>
+                <CardDescription className="text-red-600">
+                  طلاب لديهم زي أحمر (مطلوب) غير مدفوع
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {unpaidRedUniforms.map((item) => (
+                    <div 
+                      key={item.uniform.id}
+                      className="flex items-center justify-between p-3 rounded-lg bg-white border border-red-200"
+                    >
+                      <div>
+                        <Link href={`/students/${item.student.id}`} className="font-medium hover:underline text-red-700">
+                          {item.student.name}
+                        </Link>
+                        <p className="text-sm text-zinc-500">
+                          تاريخ التسليم: {new Date(item.uniform.givenDate).toLocaleDateString("en-GB")}
+                          {item.uniform.price && ` • ${item.uniform.price} TL`}
+                        </p>
+                      </div>
+                      <Badge variant="destructive">غير مدفوع</Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {overdueStudents.length === 0 && partialStudents.length === 0 && blockedStudents.length === 0 && unpaidRedUniforms.length === 0 && (
             <Card className="bg-green-50 border-green-200">
               <CardContent className="py-8 text-center">
                 <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-3" />
@@ -384,15 +476,40 @@ export default async function PaymentsPage() {
                       <Link href={`/students/${info.student.id}`} className="font-medium hover:underline">
                         {info.student.name}
                       </Link>
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
                         <Badge variant="outline" className="text-red-600 border-red-300">
-                          {info.feeConfig?.monthlyFee || "0"} TL
+                          مستحق: {info.feeConfig?.monthlyFee || "0"} TL
                         </Badge>
                         {info.daysInfo && (
                           <Badge variant="outline" className="text-orange-600 border-orange-300 text-[10px]">
                             {info.daysInfo}
                           </Badge>
                         )}
+                        {(() => {
+                          const uInfo = studentUniformMap.get(info.student.id);
+                          if (!uInfo || !uInfo.hasRedUniform) {
+                            return (
+                              <Badge variant="outline" className="text-zinc-500 border-zinc-300 text-[10px]">
+                                <Shirt className="h-3 w-3 ml-1" />
+                                بدون زي
+                              </Badge>
+                            );
+                          }
+                          if (uInfo.unpaidRed > 0) {
+                            return (
+                              <Badge variant="destructive" className="text-[10px]">
+                                <Shirt className="h-3 w-3 ml-1" />
+                                زي غير مدفوع ({uInfo.unpaidRed})
+                              </Badge>
+                            );
+                          }
+                          return (
+                            <Badge variant="outline" className="text-green-600 border-green-300 text-[10px]">
+                              <Shirt className="h-3 w-3 ml-1" />
+                              زي مدفوع
+                            </Badge>
+                          );
+                        })()}
                         {info.primaryContact?.phone && (
                           <span className="text-xs text-zinc-500" dir="ltr">
                             {info.primaryContact.phone}

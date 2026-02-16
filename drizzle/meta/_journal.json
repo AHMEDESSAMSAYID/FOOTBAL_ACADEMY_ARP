@@ -8,6 +8,13 @@
       "when": 1770804982025,
       "tag": "0000_flat_black_bolt",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1771230143248,
+      "tag": "0001_magenta_blink",
+      "breakpoints": true
     }
   ]
 }

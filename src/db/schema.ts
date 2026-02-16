@@ -139,6 +139,11 @@ export const skillCategoryEnum = pgEnum('skill_category', [
   'teamwork'
 ]);
 
+export const uniformTypeEnum = pgEnum('uniform_type', [
+  'red',
+  'navy'
+]);
+
 export const userRoleEnum = pgEnum('user_role', [
   'admin',
   'coach'
@@ -427,6 +432,20 @@ export const parentEvaluations = pgTable('parent_evaluations', {
   unique('parent_eval_student_month_year').on(table.studentId, table.month, table.year)
 ]);
 
+// Uniform records table (tracks each uniform given to a student)
+export const uniformRecords = pgTable('uniform_records', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  studentId: uuid('student_id').notNull().references(() => students.id, { onDelete: 'cascade' }),
+  uniformType: uniformTypeEnum('uniform_type').notNull(),
+  givenDate: date('given_date').notNull(),
+  price: decimal('price', { precision: 10, scale: 2 }).notNull(),
+  isPaid: boolean('is_paid').default(false).notNull(),
+  paidDate: date('paid_date'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 // ===== TYPE EXPORTS =====
 
 export type User = typeof users.$inferSelect;
@@ -473,3 +492,6 @@ export type NewEvaluation = typeof evaluations.$inferInsert;
 
 export type ParentEvaluation = typeof parentEvaluations.$inferSelect;
 export type NewParentEvaluation = typeof parentEvaluations.$inferInsert;
+
+export type UniformRecord = typeof uniformRecords.$inferSelect;
+export type NewUniformRecord = typeof uniformRecords.$inferInsert;

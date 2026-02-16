@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { db } from "@/db";
-import { students, contacts, payments, feeConfigs } from "@/db/schema";
+import { students, contacts, payments, feeConfigs, uniformRecords } from "@/db/schema";
 import { eq, desc, and, ne } from "drizzle-orm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +18,7 @@ import { EvaluationsTab } from "./_components/evaluations-tab";
 import { EscalationHistory } from "./_components/escalation-history";
 import { PaymentActions } from "./_components/payment-actions";
 import { SiblingsPanel } from "./_components/siblings-panel";
+import { UniformRecords } from "./_components/uniform-records";
 
 interface StudentPageProps {
   params: Promise<{ id: string }>;
@@ -46,6 +47,12 @@ export default async function StudentPage({ params }: StudentPageProps) {
   
   // Fetch fee config
   const studentFeeConfig = await db.select().from(feeConfigs).where(eq(feeConfigs.studentId, id));
+  
+  // Fetch uniform records
+  const studentUniformRecords = await db.select()
+    .from(uniformRecords)
+    .where(eq(uniformRecords.studentId, id))
+    .orderBy(desc(uniformRecords.givenDate));
   
   // Fetch all payments
   const studentPayments = await db.select()
@@ -220,12 +227,6 @@ export default async function StudentPage({ params }: StudentPageProps) {
                         <p className="font-medium">{studentFeeConfig[0].busFee} TL</p>
                       </div>
                     )}
-                    <div>
-                      <p className="text-zinc-500">الزي الرسمي</p>
-                      <p className="font-medium">
-                        {studentFeeConfig[0].uniformPaid ? "مدفوع ✓" : "غير مدفوع"}
-                      </p>
-                    </div>
                     {studentFeeConfig[0].discountType && (
                       <div>
                         <p className="text-zinc-500">الخصم</p>
@@ -272,6 +273,20 @@ export default async function StudentPage({ params }: StudentPageProps) {
             </CardHeader>
             <CardContent>
               <PaymentCoverageCalendar studentId={id} />
+            </CardContent>
+          </Card>
+
+          {/* Uniform Records */}
+          <Card className="bg-white">
+            <CardHeader>
+              <CardTitle className="text-base">سجلات الزي الرسمي</CardTitle>
+              <CardDescription>تتبع تسليم ودفع الأزياء الرسمية</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <UniformRecords
+                studentId={id}
+                records={studentUniformRecords as any}
+              />
             </CardContent>
           </Card>
 
