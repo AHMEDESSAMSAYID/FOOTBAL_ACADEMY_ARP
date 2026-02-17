@@ -3,7 +3,7 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 // Core admin email — auto-created as admin on first sign-in
@@ -24,9 +24,9 @@ export async function getCurrentUserRole(): Promise<{
     redirect("/sign-in");
   }
 
-  const email = clerk.emailAddresses[0]?.emailAddress || "";
+  const email = (clerk.emailAddresses[0]?.emailAddress || "").toLowerCase().trim();
 
-  // Look up user in DB
+  // 1. Look up user in DB by clerkId (fast path — already linked)
   const existing = await db
     .select()
     .from(users)
@@ -42,8 +42,35 @@ export async function getCurrentUserRole(): Promise<{
     };
   }
 
-  // Only the core admin can auto-create on first sign-in
-  if (email.toLowerCase() === CORE_ADMIN_EMAIL) {
+  // 2. Look up by email (case-insensitive) — link clerkId on first sign-in
+  const byEmail = await db
+    .select()
+    .from(users)
+    .where(sql`lower(${users.email}) = ${email}`)
+    .limit(1);
+
+  if (byEmail.length > 0) {
+    // Link the Clerk account to the existing DB record
+    const [updated] = await db
+      .update(users)
+      .set({
+        clerkId: clerk.id,
+        lastLogin: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, byEmail[0].id))
+      .returning();
+
+    return {
+      role: updated.role as "admin" | "coach",
+      userId: updated.id,
+      clerkId: clerk.id,
+      userName: updated.name,
+    };
+  }
+
+  // 3. Core admin auto-create on first sign-in
+  if (email === CORE_ADMIN_EMAIL) {
     const [newUser] = await db
       .insert(users)
       .values({
@@ -63,29 +90,6 @@ export async function getCurrentUserRole(): Promise<{
     };
   }
 
-  // Check if the user was pre-created by email (invited by admin via createCoach/createAdmin)
-  const preCreated = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, email))
-    .limit(1);
-
-  if (preCreated.length > 0 && !preCreated[0].clerkId) {
-    // Link the Clerk account to the pre-created DB record
-    const [updated] = await db
-      .update(users)
-      .set({ clerkId: clerk.id })
-      .where(eq(users.id, preCreated[0].id))
-      .returning();
-
-    return {
-      role: updated.role as "admin" | "coach",
-      userId: updated.id,
-      clerkId: clerk.id,
-      userName: updated.name,
-    };
-  }
-
-  // Not invited — deny access
-  redirect("/sign-in?error=not-invited");
+  // 4. Not invited — redirect to not-authorized page (signs them out)
+  redirect("/not-authorized");
 }
