@@ -93,14 +93,14 @@ function DashboardContent({ children, userName, userRole }: DashboardShellProps)
                 مرحباً، {userName}
               </p>
               <p className="text-xs text-zinc-500">
-                أكاديمية إسبانيول
+                 Española
               </p>
             </div>
           </div>
           
           <div className="flex items-center gap-4">
             <LayoutSwitcher />
-            <h1 className="text-lg font-bold">إسبانيول</h1>
+            <h1 className="text-lg font-bold">Española</h1>
           </div>
         </div>
       </header>

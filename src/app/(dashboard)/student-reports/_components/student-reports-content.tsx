@@ -380,7 +380,7 @@ function DetailView({
       <div className="hidden print:block print:mb-4">
         <div className="flex items-center justify-between border-b-2 border-zinc-800 pb-3">
           <div>
-            <h1 className="text-2xl font-bold">⚽ أكاديمية إسبانيول</h1>
+            <h1 className="text-2xl font-bold">⚽ أكاديمية Española</h1>
             <p className="text-sm text-zinc-600">تقرير أداء اللاعب</p>
           </div>
           <div className="text-left text-sm text-zinc-600">

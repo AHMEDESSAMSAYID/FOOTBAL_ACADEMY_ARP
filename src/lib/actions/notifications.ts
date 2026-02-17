@@ -325,7 +325,7 @@ export async function sendAttendanceSms(
           ? "غائب ❌"
           : "معذور ⚠️";
 
-    const message = `أكاديمية إسبانيول\n\nتم تسجيل حضور الطالب/ة ${studentName}\nالحالة: ${statusText}\n\nشكراً لكم`;
+    const message = `أكاديمية Española\n\nتم تسجيل حضور الطالب/ة ${studentName}\nالحالة: ${statusText}\n\nشكراً لكم`;
 
     return await sendSmsToParents(studentId, message);
   } catch (error) {
@@ -350,7 +350,7 @@ export async function sendPaymentSms(
           ? "رسوم نقل"
           : "زي رياضي";
 
-    const message = `أكاديمية إسبانيول\n\nتم تسجيل دفعة للطالب/ة ${studentName}\nالمبلغ: ${amount} ₺\nالنوع: ${typeText}\n\nشكراً لكم`;
+    const message = `أكاديمية Española\n\nتم تسجيل دفعة للطالب/ة ${studentName}\nالمبلغ: ${amount} ₺\nالنوع: ${typeText}\n\nشكراً لكم`;
 
     return await sendSmsToParents(studentId, message);
   } catch (error) {
@@ -366,7 +366,7 @@ export async function sendReportSms(
   studentName: string
 ) {
   try {
-    const message = `أكاديمية إسبانيول\n\nتقرير أداء الطالب/ة ${studentName} جاهز للمراجعة.\nيرجى التواصل مع الأكاديمية للاطلاع على التفاصيل.\n\nشكراً لكم`;
+    const message = `أكاديمية Española\n\nتقرير أداء الطالب/ة ${studentName} جاهز للمراجعة.\nيرجى التواصل مع الأكاديمية للاطلاع على التفاصيل.\n\nشكراً لكم`;
 
     return await sendSmsToParents(studentId, message);
   } catch (error) {

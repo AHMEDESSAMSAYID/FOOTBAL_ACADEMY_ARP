@@ -37,7 +37,7 @@ export function WebSidebar({ userRole }: WebSidebarProps) {
           ⚽
         </div>
         <div>
-          <h1 className="font-bold text-zinc-900">إسبانيول</h1>
+          <h1 className="font-bold text-zinc-900">Española</h1>
           <p className="text-xs text-zinc-500">نظام الإدارة</p>
         </div>
       </div>
