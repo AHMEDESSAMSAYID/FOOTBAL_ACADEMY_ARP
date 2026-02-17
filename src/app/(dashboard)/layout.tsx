@@ -3,13 +3,30 @@ import { getCurrentUserRole } from "@/lib/auth";
 import { isRouteAllowed, getDefaultRoute } from "@/lib/auth-utils";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { AuthRetryWrapper } from "./_components/auth-retry-wrapper";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { role, userName } = await getCurrentUserRole();
+  let authResult: Awaited<ReturnType<typeof getCurrentUserRole>> | null = null;
+
+  try {
+    authResult = await getCurrentUserRole();
+  } catch (error: unknown) {
+    // Re-throw NEXT_REDIRECT (redirect() throws this)
+    if (error && typeof error === "object" && "digest" in error) {
+      const digest = (error as { digest: string }).digest;
+      if (digest?.startsWith("NEXT_REDIRECT")) {
+        throw error;
+      }
+    }
+    // For any other error (DB timeout, etc.), show retry UI
+    return <AuthRetryWrapper />;
+  }
+
+  const { role, userName } = authResult;
 
   // Route guard: redirect coach away from unauthorized pages
   const headersList = await headers();
