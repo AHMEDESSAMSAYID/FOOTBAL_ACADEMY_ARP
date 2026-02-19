@@ -31,6 +31,7 @@ interface PaymentFormProps {
   studentId: string;
   studentName: string;
   registrationDate: string;
+  lastCoverageEnd: string | null;
   feeConfig?: {
     monthlyFee: string;
     busFee: string | null;
@@ -38,32 +39,21 @@ interface PaymentFormProps {
   siblings?: SiblingInfo[];
 }
 
-// Generate billing-cycle periods based on student registration date
-function generateBillingPeriods(registrationDate: string): { value: string; label: string }[] {
-  const regDate = new Date(registrationDate + "T00:00:00");
-  const billingDay = regDate.getDate();
-  const periods: { value: string; label: string }[] = [];
-
-  for (let i = -2; i < 12; i++) {
-    const startMonth = new Date(regDate.getFullYear(), regDate.getMonth() + i, 1);
-    const daysInStart = new Date(startMonth.getFullYear(), startMonth.getMonth() + 1, 0).getDate();
-    const effectiveStart = Math.min(billingDay, daysInStart);
-    const start = new Date(startMonth.getFullYear(), startMonth.getMonth(), effectiveStart);
-
-    const nextMonth = new Date(regDate.getFullYear(), regDate.getMonth() + i + 1, 1);
-    const daysInNext = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
-    const effectiveNext = Math.min(billingDay, daysInNext);
-    const end = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), effectiveNext - 1);
-
-    const value = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`;
-    const label = `${start.getDate()}/${start.getMonth() + 1} - ${end.getDate()}/${end.getMonth() + 1}`;
-    periods.push({ value, label });
-  }
-
-  return periods;
+/** Add days to YYYY-MM-DD string and return YYYY-MM-DD */
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split("T")[0];
 }
 
-export function PaymentForm({ studentId, studentName, registrationDate, feeConfig, siblings = [] }: PaymentFormProps) {
+/** Calculate inclusive days between two YYYY-MM-DD strings */
+function daysBetween(from: string, to: string): number {
+  const a = new Date(from + "T00:00:00");
+  const b = new Date(to + "T00:00:00");
+  return Math.round((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+}
+
+export function PaymentForm({ studentId, studentName, registrationDate, lastCoverageEnd, feeConfig, siblings = [] }: PaymentFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   
@@ -72,13 +62,18 @@ export function PaymentForm({ studentId, studentName, registrationDate, feeConfi
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "bank_transfer">("cash");
   const [payerName, setPayerName] = useState("");
   const [notes, setNotes] = useState("");
-  const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
   const [sendSmsNotification, setSendSmsNotification] = useState(false);
   const [alsoPayForSiblings, setAlsoPayForSiblings] = useState<string[]>([]);
-  
-  const months = generateBillingPeriods(registrationDate);
 
-  // Update amount when payment type changes
+  // Coverage date range
+  const defaultFrom = lastCoverageEnd ? addDays(lastCoverageEnd, 1) : registrationDate;
+  const defaultTo = addDays(defaultFrom, 29);
+  const [coverageFrom, setCoverageFrom] = useState(defaultFrom);
+  const [coverageTo, setCoverageTo] = useState(defaultTo);
+
+  const coverageDays = coverageFrom && coverageTo ? daysBetween(coverageFrom, coverageTo) : 0;
+  const approxMonths = coverageDays > 0 ? Math.round(coverageDays / 30) || 1 : 0;
+
   const handlePaymentTypeChange = (type: "monthly" | "bus" | "uniform") => {
     setPaymentType(type);
     if (type === "monthly" && feeConfig?.monthlyFee) {
@@ -88,18 +83,6 @@ export function PaymentForm({ studentId, studentName, registrationDate, feeConfi
     } else {
       setAmount("");
     }
-    // Clear months for uniform since it's a one-time payment
-    if (type === "uniform") {
-      setSelectedMonths([]);
-    }
-  };
-
-  const handleMonthToggle = (yearMonth: string) => {
-    setSelectedMonths((prev) => 
-      prev.includes(yearMonth) 
-        ? prev.filter((m) => m !== yearMonth)
-        : [...prev, yearMonth].sort()
-    );
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -110,8 +93,13 @@ export function PaymentForm({ studentId, studentName, registrationDate, feeConfi
       return;
     }
 
-    if (paymentType !== "uniform" && selectedMonths.length === 0) {
-      toast.error("يرجى اختيار شهر واحد على الأقل");
+    if (paymentType !== "uniform" && (!coverageFrom || !coverageTo)) {
+      toast.error("يرجى تحديد فترة التغطية");
+      return;
+    }
+
+    if (paymentType !== "uniform" && coverageTo < coverageFrom) {
+      toast.error("تاريخ النهاية يجب أن يكون بعد تاريخ البداية");
       return;
     }
 
@@ -124,7 +112,8 @@ export function PaymentForm({ studentId, studentName, registrationDate, feeConfi
         payerName: payerName || undefined,
         notes: notes || undefined,
         paymentDate: new Date().toISOString().split("T")[0],
-        monthsCovered: paymentType !== "uniform" ? selectedMonths : undefined,
+        coverageStart: paymentType !== "uniform" ? coverageFrom : undefined,
+        coverageEnd: paymentType !== "uniform" ? coverageTo : undefined,
       });
 
       if (result.success) {
@@ -135,7 +124,6 @@ export function PaymentForm({ studentId, studentName, registrationDate, feeConfi
           const sib = siblings.find((s) => s.id === sibId);
           if (!sib) continue;
           
-          // Use sibling's own fee config for amount, or same amount
           let sibAmount = parseFloat(amount);
           if (sib.feeConfig) {
             if (paymentType === "monthly") sibAmount = parseFloat(sib.feeConfig.monthlyFee);
@@ -150,7 +138,8 @@ export function PaymentForm({ studentId, studentName, registrationDate, feeConfi
             payerName: payerName || undefined,
             notes: notes ? `${notes} (دفعة مشتركة مع ${studentName})` : `دفعة مشتركة مع ${studentName}`,
             paymentDate: new Date().toISOString().split("T")[0],
-            monthsCovered: paymentType !== "uniform" ? selectedMonths : undefined,
+            coverageStart: paymentType !== "uniform" ? coverageFrom : undefined,
+            coverageEnd: paymentType !== "uniform" ? coverageTo : undefined,
           });
           if (sibResult.success) {
             toast.success(`تم تسجيل الدفعة لـ ${sib.name}`);
@@ -234,39 +223,42 @@ export function PaymentForm({ studentId, studentName, registrationDate, feeConfi
         </Select>
       </div>
 
-      {/* Months Covered */}
+      {/* Coverage Date Range */}
       {paymentType !== "uniform" && (
         <div className="grid gap-3">
-          <Label>الأشهر المغطاة *</Label>
-          <p className="text-xs text-zinc-500">اختر الأشهر التي تغطيها هذه الدفعة</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {months.map((month) => {
-              const isSelected = selectedMonths.includes(month.value);
-              return (
-                <button
-                  type="button"
-                  key={month.value}
-                  className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors text-start ${
-                    isSelected
-                      ? "bg-blue-50 border-blue-300"
-                      : "bg-white hover:bg-zinc-50"
-                  }`}
-                  onClick={() => handleMonthToggle(month.value)}
-                >
-                  <div className={`flex items-center justify-center h-4 w-4 shrink-0 rounded-sm border ${
-                    isSelected ? "bg-primary border-primary text-primary-foreground" : "border-zinc-300"
-                  }`}>
-                    {isSelected && <Check className="h-3 w-3" />}
-                  </div>
-                  <span className="text-sm">{month.label}</span>
-                </button>
-              );
-            })}
+          <Label>فترة التغطية *</Label>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1">
+              <Label htmlFor="coverageFrom" className="text-xs text-zinc-500">من</Label>
+              <Input
+                id="coverageFrom"
+                type="date"
+                value={coverageFrom}
+                onChange={(e) => setCoverageFrom(e.target.value)}
+                dir="ltr"
+                required
+              />
+            </div>
+            <div className="grid gap-1">
+              <Label htmlFor="coverageTo" className="text-xs text-zinc-500">إلى</Label>
+              <Input
+                id="coverageTo"
+                type="date"
+                value={coverageTo}
+                onChange={(e) => setCoverageTo(e.target.value)}
+                dir="ltr"
+                required
+              />
+            </div>
           </div>
-          {selectedMonths.length > 0 && (
+          {coverageDays > 0 && (
             <p className="text-sm text-blue-600">
-              عدد الأشهر: {selectedMonths.length} • 
-              المبلغ لكل شهر: {(parseFloat(amount || "0") / selectedMonths.length).toFixed(2)} TL
+              مدة التغطية: {coverageDays} يوم (~{approxMonths} شهر)
+            </p>
+          )}
+          {lastCoverageEnd && (
+            <p className="text-xs text-zinc-500">
+              آخر تغطية حتى: {lastCoverageEnd}
             </p>
           )}
         </div>
@@ -303,7 +295,7 @@ export function PaymentForm({ studentId, studentName, registrationDate, feeConfi
             تسجيل نفس الدفعة للأخوة
           </Label>
           <p className="text-xs text-zinc-500">
-            سيتم تسجيل دفعة منفصلة لكل أخ بنفس الأشهر المختارة
+            سيتم تسجيل دفعة منفصلة لكل أخ بنفس فترة التغطية
           </p>
           <div className="space-y-2">
             {siblings.map((sib) => {
@@ -349,10 +341,10 @@ export function PaymentForm({ studentId, studentName, registrationDate, feeConfi
               );
             })}
           </div>
-          {alsoPayForSiblings.length > 0 && selectedMonths.length > 0 && (
+          {alsoPayForSiblings.length > 0 && coverageDays > 0 && (
             <div className="p-3 rounded-lg bg-violet-100 border border-violet-200">
               <p className="text-sm text-violet-800 font-medium">
-                ملخص: سيتم تسجيل {alsoPayForSiblings.length + 1} دفعات ({studentName} + {alsoPayForSiblings.length} أخوة) × {selectedMonths.length} أشهر
+                ملخص: سيتم تسجيل {alsoPayForSiblings.length + 1} دفعات ({studentName} + {alsoPayForSiblings.length} أخوة)
               </p>
             </div>
           )}

@@ -2,8 +2,65 @@
 
 import { db } from "@/db";
 import { students } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql, isNull, like } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+
+/** Generate next sequential code: ESP-001, ESP-002, etc. */
+async function generateNextCode(): Promise<string> {
+  // Find the highest existing sequential code
+  const result = await db
+    .select({ num: sql<string>`membership_number` })
+    .from(students)
+    .where(like(students.membershipNumber, "ESP-%"));
+  
+  let maxNum = 0;
+  for (const row of result) {
+    const match = row.num?.match(/^ESP-(\d+)$/);
+    if (match) {
+      const n = parseInt(match[1], 10);
+      if (n > maxNum) maxNum = n;
+    }
+  }
+  
+  const next = maxNum + 1;
+  return `ESP-${String(next).padStart(3, "0")}`;
+}
+
+/** Backfill sequential codes for all students that have non-sequential or missing codes */
+export async function backfillStudentCodes() {
+  const allStudents = await db
+    .select({ id: students.id, membershipNumber: students.membershipNumber, createdAt: students.createdAt })
+    .from(students)
+    .orderBy(students.createdAt);
+  
+  // Find currently highest sequential number
+  let maxNum = 0;
+  for (const s of allStudents) {
+    const match = s.membershipNumber?.match(/^ESP-(\d+)$/);
+    if (match) {
+      const n = parseInt(match[1], 10);
+      if (n > maxNum) maxNum = n;
+    }
+  }
+  
+  // Assign new sequential codes to students without proper ones
+  let updated = 0;
+  for (const s of allStudents) {
+    const isSequential = s.membershipNumber?.match(/^ESP-\d{3,}$/);
+    if (!isSequential) {
+      maxNum++;
+      const newCode = `ESP-${String(maxNum).padStart(3, "0")}`;
+      await db
+        .update(students)
+        .set({ membershipNumber: newCode })
+        .where(eq(students.id, s.id));
+      updated++;
+    }
+  }
+  
+  revalidatePath("/students");
+  return { success: true, updated };
+}
 
 interface CreateStudentInput {
   name: string;
@@ -18,12 +75,13 @@ interface CreateStudentInput {
   address?: string;
   area?: string;
   notes?: string;
+  registrationDate?: string;
 }
 
 export async function createStudent(input: CreateStudentInput) {
   try {
-    // Generate membership number
-    const membershipNumber = `ESP-${Date.now().toString().slice(-6)}`;
+    // Generate sequential membership number ESP-001, ESP-002, ...
+    const membershipNumber = await generateNextCode();
     
     const [newStudent] = await db.insert(students).values({
       membershipNumber,
@@ -39,7 +97,7 @@ export async function createStudent(input: CreateStudentInput) {
       address: input.address,
       area: input.area,
       notes: input.notes,
-      registrationDate: new Date().toISOString().split("T")[0],
+      registrationDate: input.registrationDate || new Date().toISOString().split("T")[0],
     }).returning();
 
     revalidatePath("/students");
@@ -118,6 +176,7 @@ interface UpdateStudentInput {
   address?: string;
   area?: string;
   notes?: string;
+  registrationDate?: string;
 }
 
 export async function updateStudent(studentId: string, input: UpdateStudentInput) {
@@ -137,6 +196,7 @@ export async function updateStudent(studentId: string, input: UpdateStudentInput
         address: input.address || null,
         area: input.area || null,
         notes: input.notes || null,
+        registrationDate: input.registrationDate || undefined,
         updatedAt: new Date(),
       })
       .where(eq(students.id, studentId));

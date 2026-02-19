@@ -86,6 +86,21 @@ export default async function StudentPage({ params }: StudentPageProps) {
     }
   }
 
+  // Calculate age from birthDate
+  const calculateAge = (birthDate: string | null): string | null => {
+    if (!birthDate) return null;
+    const birth = new Date(birthDate);
+    const today = new Date();
+    let years = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      years--;
+    }
+    return `${years} سنة`;
+  };
+
+  const age = calculateAge(student.birthDate);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -97,14 +112,20 @@ export default async function StudentPage({ params }: StudentPageProps) {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold">{student.name}</h1>
+              {student.membershipNumber && (
+                <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-blue-600/20 ring-inset">
+                  {student.membershipNumber}
+                </span>
+              )}
               <StatusSelector 
                 studentId={id} 
                 currentStatus={student.status as "active" | "inactive" | "frozen" | "trial"} 
               />
             </div>
             <p className="text-sm text-zinc-500">
-              رقم العضوية: {student.membershipNumber || "غير محدد"}
-              {student.ageGroup && ` • ${ageGroupLabels[student.ageGroup]}`}
+              {age && `العمر: ${age}`}
+              {age && student.ageGroup && " • "}
+              {student.ageGroup && ageGroupLabels[student.ageGroup]}
             </p>
           </div>
         </div>
@@ -143,7 +164,10 @@ export default async function StudentPage({ params }: StudentPageProps) {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-zinc-500">تاريخ الميلاد</span>
-                  <span>{student.birthDate || "غير محدد"}</span>
+                  <span>
+                    {student.birthDate || "غير محدد"}
+                    {age && <span className="text-zinc-400 mr-2">({age})</span>}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-zinc-500">الجنسية</span>
@@ -165,6 +189,10 @@ export default async function StudentPage({ params }: StudentPageProps) {
                 <CardTitle className="text-base">معلومات التسجيل</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">رمز اللاعب</span>
+                  <span className="font-medium">{student.membershipNumber || "غير محدد"}</span>
+                </div>
                 <div className="flex justify-between">
                   <span className="text-zinc-500">تاريخ التسجيل</span>
                   <span>{student.registrationDate}</span>

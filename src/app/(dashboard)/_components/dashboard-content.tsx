@@ -25,6 +25,18 @@ interface DashboardContentProps {
   stats: DashboardStats;
 }
 
+const MONTH_NAMES = [
+  "يناير", "فبراير", "مارس", "أبريل",
+  "مايو", "يونيو", "يوليو", "أغسطس",
+  "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
+];
+
+function getMonthLabel(ym: string | null): string {
+  if (!ym) return "الشهر الحالي";
+  const [y, m] = ym.split("-").map(Number);
+  return `${MONTH_NAMES[m - 1]} ${y}`;
+}
+
 function WebDashboard({ stats }: DashboardContentProps) {
   return (
     <div className="space-y-6">
@@ -121,7 +133,7 @@ function WebDashboard({ stats }: DashboardContentProps) {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <DollarSign className="h-5 w-5" />
-              ملخص الإيرادات - الشهر الحالي
+              ملخص الإيرادات - {getMonthLabel(stats.selectedMonth)}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -238,9 +250,11 @@ function WebDashboard({ stats }: DashboardContentProps) {
                       <Link href={`/students/${item.studentId}`} className="font-medium hover:underline">
                         {item.studentName}
                       </Link>
-                      {item.amount && (
+                      {item.daysOverdue ? (
+                        <p className="text-sm text-zinc-500">متأخر {item.daysOverdue} يوم</p>
+                      ) : item.amount ? (
                         <p className="text-sm text-zinc-500">{item.amount} TL</p>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">

@@ -30,7 +30,20 @@ interface Student {
   ageGroup: string | null;
   phone: string | null;
   area: string | null;
+  birthDate: string | null;
   registrationDate: string;
+}
+
+function calculateAge(birthDate: string | null): string | null {
+  if (!birthDate) return null;
+  const birth = new Date(birthDate);
+  const today = new Date();
+  let years = today.getFullYear() - birth.getFullYear();
+  const monthDiff = today.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+    years--;
+  }
+  return `${years}`;
 }
 
 const statusLabels: Record<string, { label: string; className: string }> = {
@@ -267,6 +280,7 @@ export function StudentsTable({ students }: StudentsTableProps) {
             <TableRow className="bg-zinc-50">
               <TableHead className="text-right">اللاعب</TableHead>
               <TableHead className="text-right">رقم العضوية</TableHead>
+              <TableHead className="text-right">العمر</TableHead>
               <TableHead className="text-right">الفئة العمرية</TableHead>
               <TableHead className="text-right hidden md:table-cell">المنطقة</TableHead>
               <TableHead className="text-right hidden md:table-cell">تاريخ التسجيل</TableHead>
@@ -277,7 +291,7 @@ export function StudentsTable({ students }: StudentsTableProps) {
           <TableBody>
             {filteredStudents.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-zinc-500">
+                <TableCell colSpan={8} className="text-center py-8 text-zinc-500">
                   {students.length === 0
                     ? "لا يوجد لاعبين مسجلين بعد. قم بتسجيل أول لاعب!"
                     : "لا يوجد لاعبين مطابقين للبحث"}
@@ -297,6 +311,7 @@ export function StudentsTable({ students }: StudentsTableProps) {
                   <TableCell className="font-mono text-sm">
                     {student.membershipNumber || "-"}
                   </TableCell>
+                  <TableCell className="text-sm text-zinc-600">{calculateAge(student.birthDate) || "-"}</TableCell>
                   <TableCell>{student.ageGroup ? ageGroupLabels[student.ageGroup] || student.ageGroup : "-"}</TableCell>
                   <TableCell className="hidden md:table-cell text-sm text-zinc-600">
                     {student.area || "-"}

@@ -38,6 +38,7 @@ const formSchema = z.object({
   address: z.string().optional(),
   area: z.string().optional(),
   notes: z.string().optional(),
+  registrationDate: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -57,6 +58,7 @@ interface EditStudentFormProps {
     address: string | null;
     area: string | null;
     notes: string | null;
+    registrationDate: string;
   };
 }
 
@@ -78,6 +80,7 @@ export function EditStudentForm({ studentId, student }: EditStudentFormProps) {
       address: student.address || "",
       area: student.area || "",
       notes: student.notes || "",
+      registrationDate: student.registrationDate || "",
     },
   });
 
@@ -96,6 +99,7 @@ export function EditStudentForm({ studentId, student }: EditStudentFormProps) {
         address: values.address || undefined,
         area: values.area || undefined,
         notes: values.notes || undefined,
+        registrationDate: values.registrationDate || undefined,
       });
 
       if (result.success) {
@@ -198,6 +202,20 @@ export function EditStudentForm({ studentId, student }: EditStudentFormProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>تاريخ الميلاد</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="registrationDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>تاريخ التسجيل</FormLabel>
                   <FormControl>
                     <Input type="date" {...field} />
                   </FormControl>

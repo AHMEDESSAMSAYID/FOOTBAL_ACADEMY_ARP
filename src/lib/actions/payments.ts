@@ -75,7 +75,24 @@ interface PaymentInput {
   payerName?: string;
   notes?: string;
   paymentDate: string;
-  monthsCovered?: string[]; // Array of 'YYYY-MM' strings for coverage
+  coverageStart?: string; // YYYY-MM-DD
+  coverageEnd?: string;   // YYYY-MM-DD
+}
+
+/**
+ * Derive all YYYY-MM strings that a date range spans.
+ * E.g. 2026-01-15 → 2026-02-14 returns ["2026-01","2026-02"]
+ */
+function getMonthsInRange(start: string, end: string): string[] {
+  const s = new Date(start + "T00:00:00");
+  const e = new Date(end + "T00:00:00");
+  const months: string[] = [];
+  const cur = new Date(s.getFullYear(), s.getMonth(), 1);
+  while (cur <= e) {
+    months.push(`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}`);
+    cur.setMonth(cur.getMonth() + 1);
+  }
+  return months;
 }
 
 export async function recordPayment(input: PaymentInput) {
@@ -91,20 +108,21 @@ export async function recordPayment(input: PaymentInput) {
         payerName: input.payerName,
         notes: input.notes,
         paymentDate: input.paymentDate,
-        monthsCovered: input.monthsCovered?.length,
-        coverageStart: input.monthsCovered?.[0] ? `${input.monthsCovered[0]}-01` : undefined,
-        coverageEnd: input.monthsCovered?.length 
-          ? `${input.monthsCovered[input.monthsCovered.length - 1]}-01` 
-          : undefined,
+        coverageStart: input.coverageStart || null,
+        coverageEnd: input.coverageEnd || null,
+        monthsCovered: input.coverageStart && input.coverageEnd
+          ? getMonthsInRange(input.coverageStart, input.coverageEnd).length
+          : null,
       })
       .returning();
 
-    // Create payment coverage records for each month
-    if (input.monthsCovered && input.monthsCovered.length > 0 && input.paymentType !== "uniform") {
-      const amountPerMonth = input.amount / input.monthsCovered.length;
+    // Create payment coverage records for each month the range spans
+    if (input.coverageStart && input.coverageEnd && input.paymentType !== "uniform") {
+      const months = getMonthsInRange(input.coverageStart, input.coverageEnd);
+      const amountPerMonth = input.amount / months.length;
       const feeType = input.paymentType === "monthly" ? "monthly" : "bus";
 
-      for (const yearMonth of input.monthsCovered) {
+      for (const yearMonth of months) {
         // Check if coverage record exists
         const existingCoverage = await db.query.paymentCoverage.findFirst({
           where: (pc, { and }) => 
@@ -219,7 +237,8 @@ interface UpdatePaymentInput {
   payerName?: string;
   notes?: string;
   paymentDate: string;
-  monthsCovered?: string[]; // Array of 'YYYY-MM' strings
+  coverageStart?: string; // YYYY-MM-DD
+  coverageEnd?: string;   // YYYY-MM-DD
 }
 
 export async function updatePayment(input: UpdatePaymentInput) {
@@ -228,6 +247,10 @@ export async function updatePayment(input: UpdatePaymentInput) {
     await db
       .delete(paymentCoverage)
       .where(eq(paymentCoverage.paymentId, input.paymentId));
+
+    const months = input.coverageStart && input.coverageEnd
+      ? getMonthsInRange(input.coverageStart, input.coverageEnd)
+      : [];
 
     // 2) Update the payment record
     await db
@@ -239,17 +262,15 @@ export async function updatePayment(input: UpdatePaymentInput) {
         payerName: input.payerName || null,
         notes: input.notes || null,
         paymentDate: input.paymentDate,
-        monthsCovered: input.monthsCovered?.length || null,
-        coverageStart: input.monthsCovered?.[0] ? `${input.monthsCovered[0]}-01` : null,
-        coverageEnd: input.monthsCovered?.length
-          ? `${input.monthsCovered[input.monthsCovered.length - 1]}-01`
-          : null,
+        coverageStart: input.coverageStart || null,
+        coverageEnd: input.coverageEnd || null,
+        monthsCovered: months.length || null,
       })
       .where(eq(payments.id, input.paymentId));
 
     // 3) Re-create coverage records
-    if (input.monthsCovered && input.monthsCovered.length > 0 && input.paymentType !== "uniform") {
-      const amountPerMonth = input.amount / input.monthsCovered.length;
+    if (months.length > 0 && input.paymentType !== "uniform") {
+      const amountPerMonth = input.amount / months.length;
       const feeType = input.paymentType === "monthly" ? "monthly" : "bus";
 
       const feeConfig = await db.query.feeConfigs.findFirst({
@@ -260,7 +281,7 @@ export async function updatePayment(input: UpdatePaymentInput) {
         ? parseFloat(feeConfig?.monthlyFee || "0")
         : parseFloat(feeConfig?.busFee || "0");
 
-      for (const yearMonth of input.monthsCovered) {
+      for (const yearMonth of months) {
         // Check if another payment already covers this month
         const existingCoverage = await db.query.paymentCoverage.findFirst({
           where: (pc, { and: a }) =>
@@ -323,6 +344,41 @@ export async function deletePayment(paymentId: string, studentId: string) {
   } catch (error) {
     console.error("Error deleting payment:", error);
     return { success: false, error: "فشل في حذف الدفعة" };
+  }
+}
+
+// Quick inline update – basic fields only (no coverage recalculation)
+interface UpdatePaymentQuickInput {
+  paymentId: string;
+  studentId: string;
+  amount: number;
+  paymentType: "monthly" | "bus" | "uniform";
+  paymentMethod: "cash" | "bank_transfer";
+  payerName?: string;
+  notes?: string;
+  paymentDate: string;
+}
+
+export async function updatePaymentQuick(input: UpdatePaymentQuickInput) {
+  try {
+    await db
+      .update(payments)
+      .set({
+        amount: input.amount.toString(),
+        paymentType: input.paymentType,
+        paymentMethod: input.paymentMethod,
+        payerName: input.payerName || null,
+        notes: input.notes || null,
+        paymentDate: input.paymentDate,
+      })
+      .where(eq(payments.id, input.paymentId));
+
+    revalidatePath(`/students/${input.studentId}`);
+    revalidatePath("/payments");
+    return { success: true };
+  } catch (error) {
+    console.error("Error quick-updating payment:", error);
+    return { success: false, error: "فشل في تحديث الدفعة" };
   }
 }
 

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { db } from "@/db";
-import { students, feeConfigs, payments, paymentCoverage } from "@/db/schema";
+import { students, feeConfigs, payments } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,14 +31,6 @@ export default async function EditPaymentPage({ params }: EditPaymentPageProps) 
     where: eq(feeConfigs.studentId, id),
   });
 
-  // Get linked coverage months
-  const coverage = await db
-    .select()
-    .from(paymentCoverage)
-    .where(eq(paymentCoverage.paymentId, paymentId));
-
-  const coveredMonths = coverage.map((c) => c.yearMonth).sort();
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -57,14 +49,13 @@ export default async function EditPaymentPage({ params }: EditPaymentPageProps) 
       <Card className="bg-white max-w-2xl">
         <CardHeader>
           <CardTitle className="text-lg">تعديل تفاصيل الدفعة</CardTitle>
-          <CardDescription>عدّل بيانات الدفعة والأشهر المغطاة</CardDescription>
+          <CardDescription>عدّل بيانات الدفعة وفترة التغطية</CardDescription>
         </CardHeader>
         <CardContent>
           <EditPaymentForm
             studentId={id}
             studentName={student.name}
             paymentId={paymentId}
-            registrationDate={student.registrationDate}
             feeConfig={feeConfig ? {
               monthlyFee: feeConfig.monthlyFee,
               busFee: feeConfig.busFee,
@@ -76,7 +67,8 @@ export default async function EditPaymentPage({ params }: EditPaymentPageProps) 
               payerName: payment.payerName,
               notes: payment.notes,
               paymentDate: payment.paymentDate,
-              coveredMonths,
+              coverageStart: payment.coverageStart || "",
+              coverageEnd: payment.coverageEnd || "",
             }}
           />
         </CardContent>

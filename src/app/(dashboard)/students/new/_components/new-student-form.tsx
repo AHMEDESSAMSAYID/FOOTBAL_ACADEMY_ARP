@@ -41,6 +41,7 @@ const formSchema = z.object({
   address: z.string().optional(),
   area: z.string().optional(),
   notes: z.string().optional(),
+  registrationDate: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -69,6 +70,7 @@ export function NewStudentForm() {
       address: "",
       area: "",
       notes: "",
+      registrationDate: new Date().toISOString().split("T")[0],
     },
   });
 
@@ -101,6 +103,7 @@ export function NewStudentForm() {
         address: values.address || undefined,
         area: values.area || undefined,
         notes: values.notes || undefined,
+        registrationDate: values.registrationDate || undefined,
       });
       
       if (result.success) {
@@ -210,6 +213,21 @@ export function NewStudentForm() {
                   <FormControl>
                     <Input type="date" {...field} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="registrationDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>تاريخ التسجيل</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormDescription>يتم تعيينه تلقائياً لتاريخ اليوم</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

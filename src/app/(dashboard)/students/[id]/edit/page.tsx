@@ -43,6 +43,7 @@ export default async function EditStudentPage({ params }: EditStudentPageProps) 
               address: student.address,
               area: student.area,
               notes: student.notes,
+              registrationDate: student.registrationDate,
             }}
           />
         </CardContent>

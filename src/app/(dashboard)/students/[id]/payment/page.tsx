@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { db } from "@/db";
-import { students, feeConfigs } from "@/db/schema";
-import { eq, and, ne } from "drizzle-orm";
+import { students, feeConfigs, payments } from "@/db/schema";
+import { eq, and, ne, desc } from "drizzle-orm";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PaymentForm } from "./_components/payment-form";
 import Link from "next/link";
@@ -26,6 +26,13 @@ export default async function PaymentPage({ params }: PaymentPageProps) {
   const feeConfig = await db.query.feeConfigs.findFirst({
     where: eq(feeConfigs.studentId, id),
   });
+
+  // Fetch the student's latest monthly payment to get last coverageEnd
+  const latestPayment = await db.query.payments.findFirst({
+    where: and(eq(payments.studentId, id), eq(payments.paymentType, "monthly")),
+    orderBy: [desc(payments.coverageEnd)],
+  });
+  const lastCoverageEnd = latestPayment?.coverageEnd || null;
 
   // Fetch siblings
   let siblings: { id: string; name: string; feeConfig?: { monthlyFee: string; busFee: string | null } }[] = [];
@@ -78,6 +85,7 @@ export default async function PaymentPage({ params }: PaymentPageProps) {
             studentId={id} 
             studentName={student.name}
             registrationDate={student.registrationDate}
+            lastCoverageEnd={lastCoverageEnd}
             feeConfig={feeConfig ? {
               monthlyFee: feeConfig.monthlyFee,
               busFee: feeConfig.busFee,

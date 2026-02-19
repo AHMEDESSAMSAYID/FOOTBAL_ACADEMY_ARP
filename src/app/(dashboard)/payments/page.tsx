@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { students, payments, paymentCoverage, feeConfigs, contacts, uniformRecords } from "@/db/schema";
+import { students, payments, feeConfigs, contacts, uniformRecords } from "@/db/schema";
 import { eq, desc, sql, and } from "drizzle-orm";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,17 +15,40 @@ import {
   DollarSign,
   Shirt
 } from "lucide-react";
-import { getBillingInfo } from "@/lib/billing";
+import AllPaymentsTab from "./_components/all-payments-tab";
+import MonthPicker from "@/components/month-picker";
+import { Suspense } from "react";
 
-export default async function PaymentsPage() {
+const MONTH_NAMES = [
+  "يناير", "فبراير", "مارس", "أبريل",
+  "مايو", "يونيو", "يوليو", "أغسطس",
+  "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
+];
+
+function getCurrentYearMonth(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function getMonthLabel(ym: string | undefined): string {
+  if (!ym) return "هذا الشهر";
+  const [y, m] = ym.split("-").map(Number);
+  return `${MONTH_NAMES[m - 1]} ${y}`;
+}
+
+interface Props {
+  searchParams: Promise<{ month?: string }>;
+}
+
+export default async function PaymentsPage({ searchParams }: Props) {
+  const params = await searchParams;
+  const selectedMonth = params.month || undefined;
+  const displayMonth = selectedMonth || getCurrentYearMonth();
   // Fetch all students with their fee configs and coverage status
   const allStudents = await db.select().from(students).orderBy(students.name);
   
   // Fetch all fee configs
   const allFeeConfigs = await db.select().from(feeConfigs);
-  
-  // Fetch ALL coverage (we need different months per student based on registration date)
-  const allCoverage = await db.select().from(paymentCoverage);
 
   // Fetch recent payments
   const recentPayments = await db
@@ -37,6 +60,16 @@ export default async function PaymentsPage() {
     .innerJoin(students, eq(payments.studentId, students.id))
     .orderBy(desc(payments.createdAt))
     .limit(20);
+
+  // Fetch ALL payments for the "all" tab
+  const allPayments = await db
+    .select({
+      payment: payments,
+      student: students,
+    })
+    .from(payments)
+    .innerJoin(students, eq(payments.studentId, students.id))
+    .orderBy(desc(payments.paymentDate));
 
   // Fetch all contacts for quick dial
   const allContacts = await db.select().from(contacts);
@@ -75,15 +108,27 @@ export default async function PaymentsPage() {
     }))
     .filter(item => item.student);
 
-  // Build student payment status using per-student billing cycles
+  // Build student payment status using coverageEnd-based detection
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+  // Preload all monthly payments' coverageEnd grouped by student
+  const monthlyPaymentsByStudent = new Map<string, string[]>();
+  for (const row of allPayments) {
+    if (row.payment.paymentType === "monthly" && row.payment.coverageEnd) {
+      const sid = row.payment.studentId;
+      if (!monthlyPaymentsByStudent.has(sid)) monthlyPaymentsByStudent.set(sid, []);
+      monthlyPaymentsByStudent.get(sid)!.push(row.payment.coverageEnd);
+    }
+  }
+
   const studentPaymentMap = new Map<string, {
     student: typeof allStudents[0];
     feeConfig: typeof allFeeConfigs[0] | undefined;
-    monthlyCoverage: typeof allCoverage[0] | undefined;
-    busCoverage: typeof allCoverage[0] | undefined;
     primaryContact: typeof allContacts[0] | undefined;
     status: "paid" | "partial" | "overdue" | "no-config";
     daysInfo: string;
+    coveredUntil?: string;
   }>();
 
   for (const student of allStudents) {
@@ -93,48 +138,43 @@ export default async function PaymentsPage() {
     ) || allContacts.find(c => c.studentId === student.id);
 
     let status: "paid" | "partial" | "overdue" | "no-config" = "no-config";
-    let monthlyCoverage: typeof allCoverage[0] | undefined;
-    let busCoverage: typeof allCoverage[0] | undefined;
     let daysInfo = "";
+    let coveredUntil: string | undefined;
 
-    if (feeConfig) {
-      // Use registration-based billing cycle
-      const billing = getBillingInfo(student.registrationDate);
-      
-      monthlyCoverage = allCoverage.find(
-        c => c.studentId === student.id && c.feeType === "monthly" && c.yearMonth === billing.currentDueYearMonth
-      );
-      busCoverage = allCoverage.find(
-        c => c.studentId === student.id && c.feeType === "bus" && c.yearMonth === billing.currentDueYearMonth
-      );
-
-      if (monthlyCoverage) {
-        if (monthlyCoverage.status === "paid") {
+    if (feeConfig && (student.status === "active" || student.status === "trial")) {
+      const coverageEnds = monthlyPaymentsByStudent.get(student.id);
+      if (coverageEnds && coverageEnds.length > 0) {
+        const maxCoverageEnd = coverageEnds.sort().pop()!;
+        coveredUntil = maxCoverageEnd;
+        if (maxCoverageEnd >= todayStr) {
           status = "paid";
-          if (billing.daysUntilNextDue > 0) {
-            daysInfo = `${billing.daysUntilNextDue} يوم متبقي`;
+          const daysLeft = Math.floor(
+            (new Date(maxCoverageEnd + "T00:00:00").getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+          );
+          if (daysLeft > 0) {
+            daysInfo = `${daysLeft} يوم متبقي`;
           }
-        } else if (monthlyCoverage.status === "partial") {
-          status = "partial";
         } else {
           status = "overdue";
-          daysInfo = `متأخر ${billing.daysSinceDue} يوم`;
+          const daysLate = Math.floor(
+            (today.getTime() - new Date(maxCoverageEnd + "T00:00:00").getTime()) / (1000 * 60 * 60 * 24)
+          );
+          daysInfo = `متأخر ${daysLate} يوم`;
         }
       } else {
-        // No coverage for current due period = overdue
+        // No monthly payments at all
         status = "overdue";
-        daysInfo = `متأخر ${billing.daysSinceDue} يوم`;
+        daysInfo = "لا يوجد تغطية";
       }
     }
 
     studentPaymentMap.set(student.id, {
       student,
       feeConfig,
-      monthlyCoverage,
-      busCoverage,
       primaryContact,
       status,
       daysInfo,
+      coveredUntil,
     });
   }
 
@@ -149,10 +189,16 @@ export default async function PaymentsPage() {
     (sum, s) => sum + parseFloat(s.feeConfig?.monthlyFee || "0"),
     0
   );
-  const totalCollected = studentsWithConfig.reduce(
-    (sum, s) => sum + parseFloat(s.monthlyCoverage?.amountPaid || "0"),
-    0
-  );
+  // Collected = actual money received in the selected month (by payment date)
+  const targetYM = selectedMonth ||
+    `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+  const totalCollected = allPayments
+    .filter(row => {
+      const d = new Date(row.payment.paymentDate + "T00:00:00");
+      const pYM = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      return pYM === targetYM;
+    })
+    .reduce((sum, row) => sum + parseFloat(row.payment.amount), 0);
   const collectionRate = totalExpected > 0 
     ? Math.round((totalCollected / totalExpected) * 100) 
     : 0;
@@ -164,6 +210,13 @@ export default async function PaymentsPage() {
         <Button asChild>
           <Link href="/payments/new">تسجيل دفعة</Link>
         </Button>
+      </div>
+
+      {/* Month Picker */}
+      <div className="flex justify-center">
+        <Suspense>
+          <MonthPicker currentMonth={displayMonth} />
+        </Suspense>
       </div>
 
       {/* Stats Overview */}
@@ -222,7 +275,7 @@ export default async function PaymentsPage() {
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-zinc-500">المتوقع هذا الشهر</p>
+              <p className="text-sm text-zinc-500">المتوقع - {getMonthLabel(selectedMonth)}</p>
               <p className="text-2xl font-bold">{totalExpected.toLocaleString()} TL</p>
             </div>
             <div className="text-left">
@@ -246,6 +299,7 @@ export default async function PaymentsPage() {
           </TabsTrigger>
           <TabsTrigger value="overdue">متأخر ({overdueStudents.length})</TabsTrigger>
           <TabsTrigger value="recent">آخر المدفوعات</TabsTrigger>
+          <TabsTrigger value="all">كل المدفوعات ({allPayments.length})</TabsTrigger>
         </TabsList>
 
         {/* Needs Attention Tab */}
@@ -380,10 +434,6 @@ export default async function PaymentsPage() {
               <CardContent>
                 <div className="space-y-2">
                   {partialStudents.map((info) => {
-                    const paid = parseFloat(info.monthlyCoverage?.amountPaid || "0");
-                    const due = parseFloat(info.monthlyCoverage?.amountDue || info.feeConfig?.monthlyFee || "0");
-                    const remaining = due - paid;
-                    
                     return (
                       <div 
                         key={info.student.id}
@@ -394,7 +444,7 @@ export default async function PaymentsPage() {
                             {info.student.name}
                           </Link>
                           <p className="text-sm text-zinc-500">
-                            مدفوع: {paid} TL • متبقي: {remaining} TL
+                            مستحق: {info.feeConfig?.monthlyFee || "0"} TL
                           </p>
                         </div>
                         <Button size="sm" asChild>
@@ -575,6 +625,11 @@ export default async function PaymentsPage() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        {/* All Payments Tab */}
+        <TabsContent value="all">
+          <AllPaymentsTab payments={allPayments} />
         </TabsContent>
       </Tabs>
     </div>

@@ -15,13 +15,12 @@ import {
 } from "@/components/ui/select";
 import { updatePayment } from "@/lib/actions/payments";
 import { toast } from "sonner";
-import { Loader2, Check } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 interface EditPaymentFormProps {
   studentId: string;
   studentName: string;
   paymentId: string;
-  registrationDate: string;
   feeConfig?: {
     monthlyFee: string;
     busFee: string | null;
@@ -33,41 +32,22 @@ interface EditPaymentFormProps {
     payerName: string | null;
     notes: string | null;
     paymentDate: string;
-    coveredMonths: string[];
+    coverageStart: string;
+    coverageEnd: string;
   };
 }
 
-// Generate billing-cycle periods based on student registration date
-function generateBillingPeriods(registrationDate: string): { value: string; label: string }[] {
-  const regDate = new Date(registrationDate + "T00:00:00");
-  const billingDay = regDate.getDate();
-  const periods: { value: string; label: string }[] = [];
-
-  // Wider range for editing old payments
-  for (let i = -6; i < 12; i++) {
-    const startMonth = new Date(regDate.getFullYear(), regDate.getMonth() + i, 1);
-    const daysInStart = new Date(startMonth.getFullYear(), startMonth.getMonth() + 1, 0).getDate();
-    const effectiveStart = Math.min(billingDay, daysInStart);
-    const start = new Date(startMonth.getFullYear(), startMonth.getMonth(), effectiveStart);
-
-    const nextMonth = new Date(regDate.getFullYear(), regDate.getMonth() + i + 1, 1);
-    const daysInNext = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
-    const effectiveNext = Math.min(billingDay, daysInNext);
-    const end = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), effectiveNext - 1);
-
-    const value = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`;
-    const label = `${start.getDate()}/${start.getMonth() + 1} - ${end.getDate()}/${end.getMonth() + 1}`;
-    periods.push({ value, label });
-  }
-
-  return periods;
+/** Calculate inclusive days between two YYYY-MM-DD strings */
+function daysBetween(from: string, to: string): number {
+  const a = new Date(from + "T00:00:00");
+  const b = new Date(to + "T00:00:00");
+  return Math.round((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 }
 
 export function EditPaymentForm({
   studentId,
   studentName,
   paymentId,
-  registrationDate,
   feeConfig,
   initialData,
 }: EditPaymentFormProps) {
@@ -80,45 +60,22 @@ export function EditPaymentForm({
   const [payerName, setPayerName] = useState(initialData.payerName || "");
   const [notes, setNotes] = useState(initialData.notes || "");
   const [paymentDate, setPaymentDate] = useState(initialData.paymentDate);
-  const [selectedMonths, setSelectedMonths] = useState<string[]>(initialData.coveredMonths);
+  const [coverageFrom, setCoverageFrom] = useState(initialData.coverageStart);
+  const [coverageTo, setCoverageTo] = useState(initialData.coverageEnd);
 
-  const months = generateBillingPeriods(registrationDate);
-
-  // Also add any covered months from initialData that aren't in the range
-  const allMonths = [...months];
-  for (const ym of initialData.coveredMonths) {
-    if (!allMonths.find((m) => m.value === ym)) {
-      // Generate the label for this period based on registration date
-      const regDate = new Date(registrationDate + "T00:00:00");
-      const billingDay = regDate.getDate();
-      const [y, mo] = ym.split("-").map(Number);
-      const startMonth = new Date(y, mo - 1, 1);
-      const daysInStart = new Date(startMonth.getFullYear(), startMonth.getMonth() + 1, 0).getDate();
-      const effectiveStart = Math.min(billingDay, daysInStart);
-      const start = new Date(startMonth.getFullYear(), startMonth.getMonth(), effectiveStart);
-      const nextMonth = new Date(y, mo, 1);
-      const daysInNext = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
-      const effectiveNext = Math.min(billingDay, daysInNext);
-      const end = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), effectiveNext - 1);
-      const label = `${start.getDate()}/${start.getMonth() + 1} - ${end.getDate()}/${end.getMonth() + 1}`;
-      allMonths.push({ value: ym, label });
-    }
-  }
-  allMonths.sort((a, b) => a.value.localeCompare(b.value));
+  const coverageDays = coverageFrom && coverageTo ? daysBetween(coverageFrom, coverageTo) : 0;
+  const approxMonths = coverageDays > 0 ? Math.round(coverageDays / 30) || 1 : 0;
 
   const handlePaymentTypeChange = (type: "monthly" | "bus" | "uniform") => {
     setPaymentType(type);
-    if (type === "uniform") {
-      setSelectedMonths([]);
+    if (type === "monthly" && feeConfig?.monthlyFee) {
+      setAmount(feeConfig.monthlyFee);
+    } else if (type === "bus" && feeConfig?.busFee) {
+      setAmount(feeConfig.busFee);
+    } else if (type === "uniform") {
+      setCoverageFrom("");
+      setCoverageTo("");
     }
-  };
-
-  const handleMonthToggle = (yearMonth: string) => {
-    setSelectedMonths((prev) =>
-      prev.includes(yearMonth)
-        ? prev.filter((m) => m !== yearMonth)
-        : [...prev, yearMonth].sort()
-    );
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -129,8 +86,13 @@ export function EditPaymentForm({
       return;
     }
 
-    if (paymentType !== "uniform" && selectedMonths.length === 0) {
-      toast.error("يرجى اختيار شهر واحد على الأقل");
+    if (paymentType !== "uniform" && (!coverageFrom || !coverageTo)) {
+      toast.error("يرجى تحديد فترة التغطية");
+      return;
+    }
+
+    if (paymentType !== "uniform" && coverageTo < coverageFrom) {
+      toast.error("تاريخ النهاية يجب أن يكون بعد تاريخ البداية");
       return;
     }
 
@@ -144,7 +106,8 @@ export function EditPaymentForm({
         payerName: payerName || undefined,
         notes: notes || undefined,
         paymentDate,
-        monthsCovered: paymentType !== "uniform" ? selectedMonths : undefined,
+        coverageStart: paymentType !== "uniform" ? coverageFrom : undefined,
+        coverageEnd: paymentType !== "uniform" ? coverageTo : undefined,
       });
 
       if (result.success) {
@@ -222,39 +185,37 @@ export function EditPaymentForm({
         </Select>
       </div>
 
-      {/* Months Covered */}
+      {/* Coverage Date Range */}
       {paymentType !== "uniform" && (
         <div className="grid gap-3">
-          <Label>الأشهر المغطاة *</Label>
-          <p className="text-xs text-zinc-500">اختر الأشهر التي تغطيها هذه الدفعة</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {allMonths.map((month) => {
-              const isSelected = selectedMonths.includes(month.value);
-              return (
-                <button
-                  type="button"
-                  key={month.value}
-                  className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors text-start ${
-                    isSelected
-                      ? "bg-blue-50 border-blue-300"
-                      : "bg-white hover:bg-zinc-50"
-                  }`}
-                  onClick={() => handleMonthToggle(month.value)}
-                >
-                  <div className={`flex items-center justify-center h-4 w-4 shrink-0 rounded-sm border ${
-                    isSelected ? "bg-primary border-primary text-primary-foreground" : "border-zinc-300"
-                  }`}>
-                    {isSelected && <Check className="h-3 w-3" />}
-                  </div>
-                  <span className="text-sm">{month.label}</span>
-                </button>
-              );
-            })}
+          <Label>فترة التغطية *</Label>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1">
+              <Label htmlFor="coverageFrom" className="text-xs text-zinc-500">من</Label>
+              <Input
+                id="coverageFrom"
+                type="date"
+                value={coverageFrom}
+                onChange={(e) => setCoverageFrom(e.target.value)}
+                dir="ltr"
+                required
+              />
+            </div>
+            <div className="grid gap-1">
+              <Label htmlFor="coverageTo" className="text-xs text-zinc-500">إلى</Label>
+              <Input
+                id="coverageTo"
+                type="date"
+                value={coverageTo}
+                onChange={(e) => setCoverageTo(e.target.value)}
+                dir="ltr"
+                required
+              />
+            </div>
           </div>
-          {selectedMonths.length > 0 && (
+          {coverageDays > 0 && (
             <p className="text-sm text-blue-600">
-              عدد الأشهر: {selectedMonths.length} •
-              المبلغ لكل شهر: {(parseFloat(amount || "0") / selectedMonths.length).toFixed(2)} TL
+              مدة التغطية: {coverageDays} يوم (~{approxMonths} شهر)
             </p>
           )}
         </div>

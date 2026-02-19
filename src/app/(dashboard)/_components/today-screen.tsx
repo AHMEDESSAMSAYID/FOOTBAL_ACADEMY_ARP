@@ -21,6 +21,18 @@ interface TodayScreenProps {
   stats: DashboardStats;
 }
 
+const MONTH_NAMES_M = [
+  "يناير", "فبراير", "مارس", "أبريل",
+  "مايو", "يونيو", "يوليو", "أغسطس",
+  "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
+];
+
+function getMobileMonthLabel(ym: string | null): string {
+  if (!ym) return "هذا الشهر";
+  const [y, m] = ym.split("-").map(Number);
+  return `${MONTH_NAMES_M[m - 1]} ${y}`;
+}
+
 // Format number to Arabic numerals
 function toArabicNumerals(num: number): string {
   const arabicDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
@@ -110,7 +122,7 @@ export function TodayScreen({ stats }: TodayScreenProps) {
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-zinc-500">المتوقع هذا الشهر</p>
+              <p className="text-xs text-zinc-500">المتوقع - {getMobileMonthLabel(stats.selectedMonth)}</p>
               <p className="text-lg font-bold">{stats.expectedRevenue.toLocaleString()} TL</p>
             </div>
             <div className="h-10 w-px bg-zinc-200" />
@@ -190,7 +202,7 @@ export function TodayScreen({ stats }: TodayScreenProps) {
                   </Link>
                   <p className="text-sm text-zinc-500">
                     {item.type === "blocked" && "محظور"}
-                    {item.type === "overdue" && `متأخر ${item.amount} TL`}
+                    {item.type === "overdue" && (item.daysOverdue ? `متأخر ${item.daysOverdue} يوم` : `متأخر ${item.amount} TL`)}
                     {item.type === "partial" && `متبقي ${item.amount} TL`}
                   </p>
                 </div>
