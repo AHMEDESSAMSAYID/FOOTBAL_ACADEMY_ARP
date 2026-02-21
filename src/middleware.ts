@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
   '/not-authorized(.*)',
+  '/survey(.*)',
 ]);
 
 const isSignUpRoute = createRouteMatcher(['/sign-up(.*)']);

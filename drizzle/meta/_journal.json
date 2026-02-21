@@ -15,6 +15,20 @@
       "when": 1771230143248,
       "tag": "0001_magenta_blink",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1771660659394,
+      "tag": "0002_kind_anita_blake",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1771664494072,
+      "tag": "0003_mixed_spirit",
+      "breakpoints": true
     }
   ]
 }

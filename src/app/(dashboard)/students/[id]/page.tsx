@@ -4,6 +4,7 @@ import { students, contacts, payments, feeConfigs, uniformRecords } from "@/db/s
 import { eq, desc, and, ne } from "drizzle-orm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ContactsList } from "./_components/contacts-list";
@@ -216,6 +217,18 @@ export default async function StudentPage({ params }: StudentPageProps) {
                   <span className="text-zinc-500">الهاتف</span>
                   <span dir="ltr">{student.phone || "غير محدد"}</span>
                 </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-500">استمارة التسجيل</span>
+                  <Badge className={student.registrationFormStatus === "filled" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>
+                    {student.registrationFormStatus === "filled" ? "مسلّم ✅" : "غير مسلّم ❌"}
+                  </Badge>
+                </div>
+                {student.registrationFormNotes && (
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500">ملاحظات الاستمارة</span>
+                    <span className="text-sm text-amber-600">{student.registrationFormNotes}</span>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

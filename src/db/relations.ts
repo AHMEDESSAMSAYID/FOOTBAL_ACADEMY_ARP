@@ -22,7 +22,9 @@ import {
   escalationLogs,
   evaluations,
   parentEvaluations,
-  surveys
+  surveys,
+  expenseCategories,
+  expenses
 } from './schema';
 
 // User relations
@@ -198,4 +200,17 @@ export const parentEvaluationsRelations = relations(parentEvaluations, ({ one })
 // Survey relations
 export const surveysRelations = relations(surveys, ({ many }) => ({
   evaluations: many(parentEvaluations),
+}));
+
+// Expense category relations
+export const expenseCategoriesRelations = relations(expenseCategories, ({ many }) => ({
+  expenses: many(expenses),
+}));
+
+// Expense relations
+export const expensesRelations = relations(expenses, ({ one }) => ({
+  category: one(expenseCategories, {
+    fields: [expenses.categoryId],
+    references: [expenseCategories.id],
+  }),
 }));

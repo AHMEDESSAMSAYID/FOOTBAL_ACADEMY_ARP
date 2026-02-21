@@ -182,6 +182,8 @@ export const students = pgTable('students', {
   area: varchar('area', { length: 50 }),
   siblingGroupId: varchar('sibling_group_id', { length: 50 }),
   registrationDate: date('registration_date').notNull(),
+  registrationFormStatus: varchar('registration_form_status', { length: 20 }).default('not_filled'),
+  registrationFormNotes: text('registration_form_notes'),
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -495,3 +497,28 @@ export type NewParentEvaluation = typeof parentEvaluations.$inferInsert;
 
 export type UniformRecord = typeof uniformRecords.$inferSelect;
 export type NewUniformRecord = typeof uniformRecords.$inferInsert;
+
+// Expense categories table (predefined names)
+export const expenseCategories = pgTable('expense_categories', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 100 }).notNull().unique(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// Expenses table
+export const expenses = pgTable('expenses', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  categoryId: uuid('category_id').notNull().references(() => expenseCategories.id, { onDelete: 'restrict' }),
+  amount: integer('amount').notNull(), // stored in minor units
+  currency: varchar('currency', { length: 5 }).notNull().default('TL'), // TL or USD
+  date: varchar('date', { length: 10 }).notNull(), // YYYY-MM-DD
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export type ExpenseCategory = typeof expenseCategories.$inferSelect;
+export type NewExpenseCategory = typeof expenseCategories.$inferInsert;
+
+export type Expense = typeof expenses.$inferSelect;
+export type NewExpense = typeof expenses.$inferInsert;

@@ -39,6 +39,8 @@ const formSchema = z.object({
   area: z.string().optional(),
   notes: z.string().optional(),
   registrationDate: z.string().optional(),
+  registrationFormStatus: z.enum(["filled", "not_filled"]).optional(),
+  registrationFormNotes: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -59,6 +61,8 @@ interface EditStudentFormProps {
     area: string | null;
     notes: string | null;
     registrationDate: string;
+    registrationFormStatus: string | null;
+    registrationFormNotes: string | null;
   };
 }
 
@@ -81,6 +85,8 @@ export function EditStudentForm({ studentId, student }: EditStudentFormProps) {
       area: student.area || "",
       notes: student.notes || "",
       registrationDate: student.registrationDate || "",
+      registrationFormStatus: (student.registrationFormStatus as "filled" | "not_filled") || "not_filled",
+      registrationFormNotes: student.registrationFormNotes || "",
     },
   });
 
@@ -100,6 +106,8 @@ export function EditStudentForm({ studentId, student }: EditStudentFormProps) {
         area: values.area || undefined,
         notes: values.notes || undefined,
         registrationDate: values.registrationDate || undefined,
+        registrationFormStatus: values.registrationFormStatus as "filled" | "not_filled" || undefined,
+        registrationFormNotes: values.registrationFormNotes ?? undefined,
       });
 
       if (result.success) {
@@ -343,6 +351,48 @@ export function EditStudentForm({ studentId, student }: EditStudentFormProps) {
                   <FormLabel>ملاحظات</FormLabel>
                   <FormControl>
                     <Input placeholder="أي ملاحظات إضافية..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
+
+        {/* Registration Form Status */}
+        <div className="space-y-4">
+          <h3 className="font-semibold text-zinc-900">استمارة التسجيل</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="registrationFormStatus"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>حالة الاستمارة</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="اختر حالة الاستمارة" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="filled">مكتمل ✅</SelectItem>
+                      <SelectItem value="not_filled">غير مكتمل ❌</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>هل سلّم ولي الأمر استمارة التسجيل الورقية؟</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="registrationFormNotes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>ملاحظات الاستمارة</FormLabel>
+                  <FormControl>
+                    <Input placeholder="مثال: ناقص توقيع، بيانات غير مكتملة..." {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

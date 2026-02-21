@@ -76,6 +76,8 @@ interface CreateStudentInput {
   area?: string;
   notes?: string;
   registrationDate?: string;
+  registrationFormStatus?: "filled" | "not_filled";
+  registrationFormNotes?: string;
 }
 
 export async function createStudent(input: CreateStudentInput) {
@@ -98,6 +100,8 @@ export async function createStudent(input: CreateStudentInput) {
       area: input.area,
       notes: input.notes,
       registrationDate: input.registrationDate || new Date().toISOString().split("T")[0],
+      registrationFormStatus: input.registrationFormStatus || "not_filled",
+      registrationFormNotes: input.registrationFormNotes,
     }).returning();
 
     revalidatePath("/students");
@@ -141,6 +145,27 @@ export async function updateStudentStatus(
   }
 }
 
+// Toggle registration form status
+export async function updateRegistrationFormStatus(
+  studentId: string,
+  status: "filled" | "not_filled"
+) {
+  try {
+    await db
+      .update(students)
+      .set({ registrationFormStatus: status, updatedAt: new Date() })
+      .where(eq(students.id, studentId));
+    
+    revalidatePath(`/students/${studentId}`);
+    revalidatePath("/students");
+    
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating registration form status:", error);
+    return { success: false, error: "فشل في تحديث حالة الاستمارة" };
+  }
+}
+
 // Story 2-7: Assign Student Age Group
 export async function updateStudentAgeGroup(
   studentId: string,
@@ -177,6 +202,8 @@ interface UpdateStudentInput {
   area?: string;
   notes?: string;
   registrationDate?: string;
+  registrationFormStatus?: "filled" | "not_filled";
+  registrationFormNotes?: string;
 }
 
 export async function updateStudent(studentId: string, input: UpdateStudentInput) {
@@ -197,6 +224,8 @@ export async function updateStudent(studentId: string, input: UpdateStudentInput
         area: input.area || null,
         notes: input.notes || null,
         registrationDate: input.registrationDate || undefined,
+        registrationFormStatus: input.registrationFormStatus || undefined,
+        registrationFormNotes: input.registrationFormNotes ?? undefined,
         updatedAt: new Date(),
       })
       .where(eq(students.id, studentId));

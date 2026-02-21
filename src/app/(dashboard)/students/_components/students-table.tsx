@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useTransition } from "react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Link from "next/link";
-import { Search, X, Filter, CalendarDays } from "lucide-react";
+import { Search, X, Filter, CalendarDays, ArrowUpDown, ArrowUp, ArrowDown, Loader2 } from "lucide-react";
+import { updateRegistrationFormStatus } from "@/lib/actions/students";
 
 interface Student {
   id: string;
@@ -32,9 +33,10 @@ interface Student {
   area: string | null;
   birthDate: string | null;
   registrationDate: string;
+  registrationFormStatus: string | null;
 }
 
-function calculateAge(birthDate: string | null): string | null {
+function calculateAge(birthDate: string | null): number | null {
   if (!birthDate) return null;
   const birth = new Date(birthDate);
   const today = new Date();
@@ -43,7 +45,7 @@ function calculateAge(birthDate: string | null): string | null {
   if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
     years--;
   }
-  return `${years}`;
+  return years;
 }
 
 const statusLabels: Record<string, { label: string; className: string }> = {
@@ -59,19 +61,63 @@ const ageGroupLabels: Record<string, string> = {
   "15+": "فوق ١٥",
 };
 
+const formStatusLabels: Record<string, { label: string; className: string }> = {
+  filled: { label: "مكتمل", className: "bg-green-100 text-green-700" },
+  not_filled: { label: "غير مكتمل", className: "bg-red-100 text-red-700" },
+};
+
+type SortColumn = "name" | "membershipNumber" | "age" | "ageGroup" | "area" | "registrationDate" | "status" | "formStatus";
+type SortDirection = "asc" | "desc";
+
+function SortableHeader({ 
+  label, column, sortColumn, sortDirection, onSort, className 
+}: { 
+  label: string; column: SortColumn; sortColumn: SortColumn; sortDirection: SortDirection; onSort: (col: SortColumn) => void; className?: string;
+}) {
+  const isActive = sortColumn === column;
+  return (
+    <TableHead 
+      className={`text-right cursor-pointer select-none hover:bg-zinc-100 transition-colors ${className || ""}`}
+      onClick={() => onSort(column)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        {isActive ? (
+          sortDirection === "asc" ? <ArrowUp className="h-3.5 w-3.5 text-zinc-700" /> : <ArrowDown className="h-3.5 w-3.5 text-zinc-700" />
+        ) : (
+          <ArrowUpDown className="h-3 w-3 text-zinc-300" />
+        )}
+      </span>
+    </TableHead>
+  );
+}
+
 interface StudentsTableProps {
   students: Student[];
 }
 
 export function StudentsTable({ students }: StudentsTableProps) {
+  const [isPending, startTransition] = useTransition();
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [ageGroupFilter, setAgeGroupFilter] = useState<string>("all");
   const [areaFilter, setAreaFilter] = useState<string>("all");
+  const [formStatusFilter, setFormStatusFilter] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [sortBy, setSortBy] = useState<string>("name");
+  const [sortColumn, setSortColumn] = useState<SortColumn>("name");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [showFilters, setShowFilters] = useState(false);
+
+  const handleSort = (col: SortColumn) => {
+    if (sortColumn === col) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(col);
+      setSortDirection("asc");
+    }
+  };
 
   // Extract unique areas from data
   const areas = useMemo(() => {
@@ -86,6 +132,7 @@ export function StudentsTable({ students }: StudentsTableProps) {
     statusFilter !== "all" ||
     ageGroupFilter !== "all" ||
     areaFilter !== "all" ||
+    formStatusFilter !== "all" ||
     dateFrom !== "" ||
     dateTo !== "";
 
@@ -93,10 +140,12 @@ export function StudentsTable({ students }: StudentsTableProps) {
     setStatusFilter("all");
     setAgeGroupFilter("all");
     setAreaFilter("all");
+    setFormStatusFilter("all");
     setDateFrom("");
     setDateTo("");
     setSearch("");
-    setSortBy("name");
+    setSortColumn("name");
+    setSortDirection("asc");
   };
 
   const filteredStudents = useMemo(() => {
@@ -112,32 +161,46 @@ export function StudentsTable({ students }: StudentsTableProps) {
         ageGroupFilter === "all" || student.ageGroup === ageGroupFilter;
       const matchesArea =
         areaFilter === "all" || student.area === areaFilter;
+      const matchesFormStatus =
+        formStatusFilter === "all" || (student.registrationFormStatus || "not_filled") === formStatusFilter;
       const matchesDateFrom =
         !dateFrom || student.registrationDate >= dateFrom;
       const matchesDateTo =
         !dateTo || student.registrationDate <= dateTo;
 
-      return matchesSearch && matchesStatus && matchesAgeGroup && matchesArea && matchesDateFrom && matchesDateTo;
+      return matchesSearch && matchesStatus && matchesAgeGroup && matchesArea && matchesFormStatus && matchesDateFrom && matchesDateTo;
     });
 
     // Sort
+    const dir = sortDirection === "asc" ? 1 : -1;
     result.sort((a, b) => {
-      switch (sortBy) {
+      switch (sortColumn) {
         case "name":
-          return a.name.localeCompare(b.name, "ar");
-        case "date-new":
-          return b.registrationDate.localeCompare(a.registrationDate);
-        case "date-old":
-          return a.registrationDate.localeCompare(b.registrationDate);
+          return dir * a.name.localeCompare(b.name, "ar");
+        case "membershipNumber":
+          return dir * (a.membershipNumber || "").localeCompare(b.membershipNumber || "");
+        case "age": {
+          const ageA = calculateAge(a.birthDate) ?? 999;
+          const ageB = calculateAge(b.birthDate) ?? 999;
+          return dir * (ageA - ageB);
+        }
+        case "ageGroup":
+          return dir * (a.ageGroup || "").localeCompare(b.ageGroup || "");
+        case "area":
+          return dir * (a.area || "").localeCompare(b.area || "", "ar");
+        case "registrationDate":
+          return dir * a.registrationDate.localeCompare(b.registrationDate);
         case "status":
-          return a.status.localeCompare(b.status);
+          return dir * a.status.localeCompare(b.status);
+        case "formStatus":
+          return dir * (a.registrationFormStatus || "not_filled").localeCompare(b.registrationFormStatus || "not_filled");
         default:
           return 0;
       }
     });
 
     return result;
-  }, [students, search, statusFilter, ageGroupFilter, areaFilter, dateFrom, dateTo, sortBy]);
+  }, [students, search, statusFilter, ageGroupFilter, areaFilter, formStatusFilter, dateFrom, dateTo, sortColumn, sortDirection]);
 
   return (
     <div className="space-y-4">
@@ -229,18 +292,17 @@ export function StudentsTable({ students }: StudentsTableProps) {
               </Select>
             </div>
 
-            {/* Sort */}
+            {/* Registration Form Status */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-500">الترتيب</label>
-              <Select value={sortBy} onValueChange={setSortBy}>
+              <label className="text-xs font-medium text-zinc-500">استمارة التسجيل</label>
+              <Select value={formStatusFilter} onValueChange={setFormStatusFilter}>
                 <SelectTrigger className="bg-white">
-                  <SelectValue />
+                  <SelectValue placeholder="استمارة التسجيل" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="name">الاسم (أبجدي)</SelectItem>
-                  <SelectItem value="date-new">التسجيل (الأحدث)</SelectItem>
-                  <SelectItem value="date-old">التسجيل (الأقدم)</SelectItem>
-                  <SelectItem value="status">الحالة</SelectItem>
+                  <SelectItem value="all">الكل</SelectItem>
+                  <SelectItem value="filled">مكتمل</SelectItem>
+                  <SelectItem value="not_filled">غير مكتمل</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -278,27 +340,31 @@ export function StudentsTable({ students }: StudentsTableProps) {
         <Table>
           <TableHeader>
             <TableRow className="bg-zinc-50">
-              <TableHead className="text-right">اللاعب</TableHead>
-              <TableHead className="text-right">رقم العضوية</TableHead>
-              <TableHead className="text-right">العمر</TableHead>
-              <TableHead className="text-right">الفئة العمرية</TableHead>
-              <TableHead className="text-right hidden md:table-cell">المنطقة</TableHead>
-              <TableHead className="text-right hidden md:table-cell">تاريخ التسجيل</TableHead>
-              <TableHead className="text-right">الحالة</TableHead>
+              <SortableHeader label="اللاعب" column="name" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+              <SortableHeader label="رقم العضوية" column="membershipNumber" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+              <SortableHeader label="العمر" column="age" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+              <SortableHeader label="الفئة العمرية" column="ageGroup" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+              <SortableHeader label="المنطقة" column="area" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} className="hidden md:table-cell" />
+              <SortableHeader label="تاريخ التسجيل" column="registrationDate" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} className="hidden md:table-cell" />
+              <SortableHeader label="الحالة" column="status" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+              <SortableHeader label="الاستمارة" column="formStatus" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} className="hidden md:table-cell" />
               <TableHead className="text-right">إجراءات</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredStudents.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-zinc-500">
+                <TableCell colSpan={9} className="text-center py-8 text-zinc-500">
                   {students.length === 0
                     ? "لا يوجد لاعبين مسجلين بعد. قم بتسجيل أول لاعب!"
                     : "لا يوجد لاعبين مطابقين للبحث"}
                 </TableCell>
               </TableRow>
             ) : (
-              filteredStudents.map((student) => (
+              filteredStudents.map((student) => {
+                const age = calculateAge(student.birthDate);
+                const formSt = student.registrationFormStatus || "not_filled";
+                return (
                 <TableRow key={student.id} className="hover:bg-zinc-50">
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -311,7 +377,7 @@ export function StudentsTable({ students }: StudentsTableProps) {
                   <TableCell className="font-mono text-sm">
                     {student.membershipNumber || "-"}
                   </TableCell>
-                  <TableCell className="text-sm text-zinc-600">{calculateAge(student.birthDate) || "-"}</TableCell>
+                  <TableCell className="text-sm text-zinc-600">{age != null ? String(age) : "-"}</TableCell>
                   <TableCell>{student.ageGroup ? ageGroupLabels[student.ageGroup] || student.ageGroup : "-"}</TableCell>
                   <TableCell className="hidden md:table-cell text-sm text-zinc-600">
                     {student.area || "-"}
@@ -324,13 +390,36 @@ export function StudentsTable({ students }: StudentsTableProps) {
                       {statusLabels[student.status]?.label || student.status}
                     </Badge>
                   </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <button
+                      onClick={() => {
+                        const newStatus = formSt === "filled" ? "not_filled" : "filled";
+                        setTogglingId(student.id);
+                        startTransition(async () => {
+                          await updateRegistrationFormStatus(student.id, newStatus);
+                          setTogglingId(null);
+                        });
+                      }}
+                      disabled={togglingId === student.id}
+                      className="cursor-pointer hover:opacity-70 transition-opacity"
+                    >
+                      {togglingId === student.id ? (
+                        <Badge className="bg-zinc-100 text-zinc-500"><Loader2 className="h-3 w-3 animate-spin" /></Badge>
+                      ) : (
+                        <Badge className={formStatusLabels[formSt]?.className || "bg-zinc-100 text-zinc-700"}>
+                          {formStatusLabels[formSt]?.label || formSt}
+                        </Badge>
+                      )}
+                    </button>
+                  </TableCell>
                   <TableCell>
                     <Button variant="ghost" size="sm" asChild>
                       <Link href={`/students/${student.id}`}>عرض</Link>
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))
+                );
+              })
             )}
           </TableBody>
         </Table>

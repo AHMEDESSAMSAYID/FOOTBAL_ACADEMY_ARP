@@ -44,6 +44,8 @@ export default async function EditStudentPage({ params }: EditStudentPageProps) 
               area: student.area,
               notes: student.notes,
               registrationDate: student.registrationDate,
+              registrationFormStatus: student.registrationFormStatus,
+              registrationFormNotes: student.registrationFormNotes,
             }}
           />
         </CardContent>
