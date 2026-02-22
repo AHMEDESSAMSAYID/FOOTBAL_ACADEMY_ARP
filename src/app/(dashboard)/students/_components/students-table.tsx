@@ -347,7 +347,7 @@ export function StudentsTable({ students }: StudentsTableProps) {
               <SortableHeader label="المنطقة" column="area" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} className="hidden md:table-cell" />
               <SortableHeader label="تاريخ التسجيل" column="registrationDate" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} className="hidden md:table-cell" />
               <SortableHeader label="الحالة" column="status" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
-              <SortableHeader label="الاستمارة" column="formStatus" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} className="hidden md:table-cell" />
+              <SortableHeader label="الاستمارة" column="formStatus" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
               <TableHead className="text-right">إجراءات</TableHead>
             </TableRow>
           </TableHeader>
@@ -390,7 +390,7 @@ export function StudentsTable({ students }: StudentsTableProps) {
                       {statusLabels[student.status]?.label || student.status}
                     </Badge>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell">
+                  <TableCell>
                     <button
                       onClick={() => {
                         const newStatus = formSt === "filled" ? "not_filled" : "filled";
