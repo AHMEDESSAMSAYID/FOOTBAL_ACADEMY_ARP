@@ -413,9 +413,14 @@ export function StudentsTable({ students }: StudentsTableProps) {
                     </button>
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link href={`/students/${student.id}`}>عرض</Link>
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link href={`/students/${student.id}`}>عرض</Link>
+                      </Button>
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/students/${student.id}/edit`}>تعديل ✏️</Link>
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
                 );

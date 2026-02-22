@@ -98,7 +98,8 @@ const entityIcons: Record<string, React.ReactNode> = {
 };
 
 function downloadCsv(data: string, filename: string) {
-  const blob = new Blob([data], { type: "text/csv;charset=utf-8;" });
+  const BOM = "\uFEFF";
+  const blob = new Blob([BOM + data], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
