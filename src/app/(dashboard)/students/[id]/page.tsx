@@ -220,7 +220,7 @@ export default async function StudentPage({ params }: StudentPageProps) {
                 <div className="flex justify-between items-center">
                   <span className="text-zinc-500">استمارة التسجيل</span>
                   <Badge className={student.registrationFormStatus === "filled" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>
-                    {student.registrationFormStatus === "filled" ? "مسلّم ✅" : "غير مسلّم ❌"}
+                    {student.registrationFormStatus === "filled" ? "مكتمل ✅" : "غير مكتمل ❌"}
                   </Badge>
                 </div>
                 {student.registrationFormNotes && (
