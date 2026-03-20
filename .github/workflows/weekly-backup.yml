@@ -6,38 +6,62 @@ on:
     - cron: '0 3 * * 0'
   workflow_dispatch: # Allow manual trigger
 
+env:
+  BACKUP_BUCKET: ${{ secrets.GCS_BUCKET_NAME }}
+
 jobs:
   backup:
     runs-on: ubuntu-latest
     steps:
-      - name: Install Neon CLI
-        run: npm install -g neonctl
-
-      - name: Create Backup Branch
+      - name: Set backup filename
         run: |
-          DATE=$(date +%Y-%m-%d)
-          echo "Creating backup branch: backup-$DATE"
-          neonctl branches create \
-            --name "backup-$DATE" \
-            --project-id ${{ secrets.NEON_PROJECT_ID }}
+          DATE=$(date +%Y-%m-%d_%H-%M)
+          echo "BACKUP_FILE=espanyol-academy-backup-$DATE.sql.gz" >> $GITHUB_ENV
+          echo "DATE=$DATE" >> $GITHUB_ENV
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Export database with pg_dump
+        run: |
+          echo "Exporting database..."
+          pg_dump "${{ secrets.DATABASE_URL }}" | gzip > ${{ env.BACKUP_FILE }}
+          ls -lh ${{ env.BACKUP_FILE }}
         env:
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PGPASSWORD: ${{ secrets.DB_PASSWORD }}
 
-      - name: Cleanup Old Backups (keep last 4 weeks)
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+
+      - name: Setup Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Upload to Google Cloud Storage
         run: |
-          echo "Listing backup branches..."
-          BRANCHES=$(neonctl branches list --project-id ${{ secrets.NEON_PROJECT_ID }} --output json)
+          echo "Uploading to GCS bucket: ${{ env.BACKUP_BUCKET }}"
+          gsutil cp ${{ env.BACKUP_FILE }} gs://${{ env.BACKUP_BUCKET }}/backups/
+          echo "✅ Backup uploaded: gs://${{ env.BACKUP_BUCKET }}/backups/${{ env.BACKUP_FILE }}"
+
+      - name: Cleanup old backups (keep last 8 weeks)
+        run: |
+          echo "Cleaning up backups older than 56 days..."
+          gsutil ls -l gs://${{ env.BACKUP_BUCKET }}/backups/ | \
+            awk -v cutoff=$(date -d '56 days ago' +%Y-%m-%d) '$2 < cutoff {print $3}' | \
+            xargs -r gsutil rm || true
+
+      - name: Verify backup
+        run: |
+          echo "Verifying backup exists..."
+          gsutil ls gs://${{ env.BACKUP_BUCKET }}/backups/${{ env.BACKUP_FILE }}
+          SIZE=$(gsutil du -s gs://${{ env.BACKUP_BUCKET }}/backups/${{ env.BACKUP_FILE }} | awk '{print $1}')
+          echo "Backup size: $SIZE bytes"
           
-          # Get backup branches older than 28 days
-          echo "$BRANCHES" | jq -r '.[] | select(.name | startswith("backup-")) | .name' | while read branch; do
-            BRANCH_DATE=$(echo $branch | sed 's/backup-//')
-            BRANCH_TS=$(date -d "$BRANCH_DATE" +%s 2>/dev/null || echo 0)
-            CUTOFF_TS=$(date -d "28 days ago" +%s)
-            
-            if [ "$BRANCH_TS" -lt "$CUTOFF_TS" ] && [ "$BRANCH_TS" -ne 0 ]; then
-              echo "Deleting old backup: $branch"
-              neonctl branches delete $branch --project-id ${{ secrets.NEON_PROJECT_ID }} || true
-            fi
-          done
-        env:
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          if [ "$SIZE" -lt 1000 ]; then
+            echo "❌ Backup seems too small!"
+            exit 1
+          fi
+          echo "✅ Backup verified successfully"
