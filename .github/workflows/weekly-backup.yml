@@ -32,29 +32,51 @@ jobs:
           DB_URL="${{ secrets.DATABASE_URL }}"
           DB_URL=$(echo "$DB_URL" | sed 's/&channel_binding=[^&]*//g' | sed 's/?channel_binding=[^&]*&/?/g' | sed 's/?channel_binding=[^&]*$//')
           
+          echo "Cleaned URL (masked): postgresql://***@***/neondb?sslmode=require"
+          
           echo "Testing database connection..."
           
-          # Test connection first
-          if ! psql "$DB_URL" -c "SELECT 1" > /dev/null 2>&1; then
+          # Test connection first with output
+          psql "$DB_URL" -c "SELECT current_database(), pg_size_pretty(pg_database_size(current_database()));" || {
             echo "❌ Failed to connect to database!"
             echo "Check your DATABASE_URL secret is correct"
             exit 1
-          fi
+          }
           
           echo "✅ Database connection successful"
           
-          # Export with verbose output
-          pg_dump "$DB_URL" --verbose 2>&1 | gzip > ${{ env.BACKUP_FILE }}
+          # First do a plain dump to a file (not piped) to capture errors properly
+          echo "Running pg_dump..."
+          pg_dump "$DB_URL" --no-owner --no-acl > backup.sql 2>pg_dump_errors.log
+          DUMP_EXIT=$?
           
-          # Check file size
-          SIZE=$(stat -c%s ${{ env.BACKUP_FILE }})
-          echo "Backup file size: $SIZE bytes"
+          # Show any errors
+          if [ -s pg_dump_errors.log ]; then
+            echo "pg_dump output:"
+            cat pg_dump_errors.log
+          fi
           
-          if [ "$SIZE" -lt 100 ]; then
-            echo "❌ Backup file too small - pg_dump may have failed"
-            gunzip -c ${{ env.BACKUP_FILE }} || true
+          if [ $DUMP_EXIT -ne 0 ]; then
+            echo "❌ pg_dump failed with exit code $DUMP_EXIT"
             exit 1
           fi
+          
+          # Check raw dump size
+          RAW_SIZE=$(stat -c%s backup.sql)
+          echo "Raw dump size: $RAW_SIZE bytes"
+          
+          if [ "$RAW_SIZE" -lt 1000 ]; then
+            echo "❌ Dump too small. Content:"
+            cat backup.sql
+            exit 1
+          fi
+          
+          # Compress
+          gzip -c backup.sql > ${{ env.BACKUP_FILE }}
+          
+          # Check compressed size
+          SIZE=$(stat -c%s ${{ env.BACKUP_FILE }})
+          echo "Compressed backup size: $SIZE bytes"
           
           echo "✅ Export successful"
           ls -lh ${{ env.BACKUP_FILE }}
