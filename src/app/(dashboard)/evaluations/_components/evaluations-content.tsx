@@ -342,7 +342,7 @@ export function EvaluationsContent() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">تقييم المدرب</h1>
+        <h1 className="text-xl font-bold">تقييم لاعب الشهر</h1>
       </div>
 
       {/* Month/Year Selector */}

@@ -133,8 +133,8 @@ function GroupCard({ group }: { group: GroupData }) {
           />
           <StatBox
             icon={Star}
-            label="معدل تقييم المدرب"
-            value={group.avgCoachScore > 0 ? `${group.avgCoachScore}/50` : "—"}
+            label="معدل تقييم لاعب الشهر"
+            value={group.avgCoachScore > 0 ? `${Math.round((group.avgCoachScore / 50) * 46 * 10) / 10}/46` : "—"}
             iconBg="bg-amber-100 text-amber-600"
           />
           <StatBox
@@ -164,7 +164,7 @@ function GroupCard({ group }: { group: GroupData }) {
             <div className="mb-1 flex items-center justify-between text-[10px]">
               <span className="text-zinc-500">التقييم</span>
               <span className={scoreColor(scorePct(group.avgCoachScore, 50))}>
-                {group.avgCoachScore > 0 ? `${Math.round(scorePct(group.avgCoachScore, 50))}%` : "—"}
+                {group.avgCoachScore > 0 ? `${Math.round((group.avgCoachScore / 50) * 46 * 10) / 10}/46` : "—"}
               </span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-zinc-100">
@@ -210,7 +210,7 @@ function GroupCard({ group }: { group: GroupData }) {
                   <th className="px-4 py-2 text-right text-xs font-medium">اللاعب</th>
                   <th className="px-4 py-2 text-center text-xs font-medium">الحالة</th>
                   <th className="px-4 py-2 text-center text-xs font-medium">الحضور</th>
-                  <th className="px-4 py-2 text-center text-xs font-medium">تقييم المدرب</th>
+                  <th className="px-4 py-2 text-center text-xs font-medium">تقييم لاعب الشهر</th>
                   <th className="w-16 px-4 py-2"></th>
                 </tr>
               </thead>
@@ -245,7 +245,7 @@ function GroupCard({ group }: { group: GroupData }) {
                         <td className="px-4 py-2.5 text-center">
                           {s.coachScore !== null ? (
                             <span className={`font-medium ${scoreColor(scorePct(s.coachScore, 50))}`}>
-                              {s.coachScore}/50
+                              {Math.round((s.coachScore / 50) * 46 * 10) / 10}/46
                             </span>
                           ) : (
                             <span className="text-zinc-300">—</span>

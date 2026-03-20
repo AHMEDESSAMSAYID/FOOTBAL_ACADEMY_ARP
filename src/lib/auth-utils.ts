@@ -36,7 +36,7 @@ export function getNavItemsForRole(role: UserRole) {
   ];
 
   const secondaryNavItems = [
-    { href: "/evaluations", label: "تقييم المدرب", icon: "⭐" },
+    { href: "/evaluations", label: "تقييم لاعب الشهر", icon: "⭐" },
     { href: "/student-reports", label: "تقارير الأداء", icon: "📊" },
     { href: "/reports", label: "التقارير", icon: "📈" },
     { href: "/attendance", label: "الحضور", icon: "✅" },
@@ -73,7 +73,7 @@ export function getMobileNavItemsForRole(role: UserRole) {
   ];
 
   const managementItems = [
-    { href: "/evaluations", label: "تقييم المدرب", icon: "⭐" },
+    { href: "/evaluations", label: "تقييم لاعب الشهر", icon: "⭐" },
     { href: "/student-reports", label: "تقارير الأداء", icon: "📊" },
     { href: "/reports", label: "التقارير", icon: "📈" },
     { href: "/attendance", label: "الحضور", icon: "✅" },

@@ -108,9 +108,56 @@ export default async function PaymentsPage({ searchParams }: Props) {
     }))
     .filter(item => item.student);
 
+  // Unpaid navy uniforms
+  const unpaidNavyUniforms = allUniformRecords
+    .filter(r => r.uniformType === "navy" && !r.isPaid)
+    .map(r => ({
+      uniform: r,
+      student: allStudents.find(s => s.id === r.studentId)!,
+    }))
+    .filter(item => item.student);
+
   // Build student payment status using coverageEnd-based detection
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+  // Students with bus subscription not paid for current month
+  const busPaymentsByStudent = new Map<string, string[]>();
+  for (const row of allPayments) {
+    if (row.payment.paymentType === "bus" && row.payment.coverageEnd) {
+      const sid = row.payment.studentId;
+      if (!busPaymentsByStudent.has(sid)) busPaymentsByStudent.set(sid, []);
+      busPaymentsByStudent.get(sid)!.push(row.payment.coverageEnd);
+    }
+  }
+
+  const unpaidBusStudents = allStudents
+    .filter(s => s.status === "active" || s.status === "trial")
+    .map(s => {
+      const feeConfig = allFeeConfigs.find(fc => fc.studentId === s.id);
+      if (!feeConfig || !feeConfig.busFee || parseFloat(feeConfig.busFee) <= 0) return null;
+      const busCoverageEnds = busPaymentsByStudent.get(s.id);
+      let daysLate = 0;
+      let daysInfo = "";
+      if (!busCoverageEnds || busCoverageEnds.length === 0) {
+        daysInfo = "لا يوجد تغطية";
+      } else {
+        const maxCoverageEnd = [...busCoverageEnds].sort().pop()!;
+        if (maxCoverageEnd >= todayStr) return null; // Still covered
+        daysLate = Math.floor(
+          (today.getTime() - new Date(maxCoverageEnd + "T00:00:00").getTime()) / (1000 * 60 * 60 * 24)
+        );
+        daysInfo = `متأخر ${daysLate} يوم`;
+      }
+      return {
+        student: s,
+        feeConfig,
+        primaryContact: allContacts.find(c => c.studentId === s.id && c.isPrimaryPayer) || allContacts.find(c => c.studentId === s.id),
+        daysLate,
+        daysInfo,
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
 
   // Preload all monthly payments' coverageEnd grouped by student
   const monthlyPaymentsByStudent = new Map<string, string[]>();
@@ -179,13 +226,13 @@ export default async function PaymentsPage({ searchParams }: Props) {
   }
 
   const studentsWithConfig = Array.from(studentPaymentMap.values()).filter(s => s.feeConfig);
+  const activeStudentsWithConfig = studentsWithConfig.filter(s => s.student.status === "active" || s.student.status === "trial");
   const paidStudents = studentsWithConfig.filter(s => s.status === "paid");
   const partialStudents = studentsWithConfig.filter(s => s.status === "partial");
   const overdueStudents = studentsWithConfig.filter(s => s.status === "overdue" && s.student.status === "active");
-  const blockedStudents = allStudents.filter(s => s.status === "frozen");
 
-  // Calculate totals
-  const totalExpected = studentsWithConfig.reduce(
+  // Calculate totals - only active + trial students
+  const totalExpected = activeStudentsWithConfig.reduce(
     (sum, s) => sum + parseFloat(s.feeConfig?.monthlyFee || "0"),
     0
   );
@@ -291,9 +338,9 @@ export default async function PaymentsPage({ searchParams }: Props) {
         <TabsList>
           <TabsTrigger value="attention" className="relative">
             يحتاج متابعة
-            {(overdueStudents.length + partialStudents.length + blockedStudents.length + unpaidRedUniforms.length) > 0 && (
+            {(overdueStudents.length + partialStudents.length + unpaidRedUniforms.length + unpaidNavyUniforms.length + unpaidBusStudents.length) > 0 && (
               <span className="absolute -top-1 -left-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
-                {overdueStudents.length + partialStudents.length + blockedStudents.length + unpaidRedUniforms.length}
+                {overdueStudents.length + partialStudents.length + unpaidRedUniforms.length + unpaidNavyUniforms.length + unpaidBusStudents.length}
               </span>
             )}
           </TabsTrigger>
@@ -304,50 +351,6 @@ export default async function PaymentsPage({ searchParams }: Props) {
 
         {/* Needs Attention Tab */}
         <TabsContent value="attention" className="space-y-4">
-          {/* Blocked Students */}
-          {blockedStudents.length > 0 && (
-            <Card className="border-red-300 bg-red-50">
-              <CardHeader>
-                <CardTitle className="text-base text-red-700">
-                  🚫 محظور ({blockedStudents.length})
-                </CardTitle>
-                <CardDescription className="text-red-600">
-                  لاعبين تم تجميد عضويتهم بسبب عدم السداد
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {blockedStudents.map((student) => {
-                    const info = studentPaymentMap.get(student.id);
-                    return (
-                      <div 
-                        key={student.id}
-                        className="flex items-center justify-between p-3 rounded-lg bg-white"
-                      >
-                        <div>
-                          <Link href={`/students/${student.id}`} className="font-medium hover:underline">
-                            {student.name}
-                          </Link>
-                          <p className="text-sm text-zinc-500">
-                            {info?.feeConfig?.monthlyFee || "غير محدد"} TL/شهر
-                          </p>
-                        </div>
-                        {info?.primaryContact?.phone && (
-                          <Button variant="outline" size="sm" asChild>
-                            <a href={`tel:${info.primaryContact.phone}`}>
-                              <Phone className="h-4 w-4 ms-1" />
-                              اتصال
-                            </a>
-                          </Button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
           {/* Overdue Students */}
           {overdueStudents.length > 0 && (
             <Card className="border-red-200">
@@ -495,7 +498,100 @@ export default async function PaymentsPage({ searchParams }: Props) {
             </Card>
           )}
 
-          {overdueStudents.length === 0 && partialStudents.length === 0 && blockedStudents.length === 0 && unpaidRedUniforms.length === 0 && (
+          {/* Unpaid Navy Uniforms */}
+          {unpaidNavyUniforms.length > 0 && (
+            <Card className="border-blue-300 bg-blue-50">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <Shirt className="h-5 w-5 text-blue-600" />
+                  <CardTitle className="text-lg text-blue-700">
+                    زي كحلي غير مدفوع ({unpaidNavyUniforms.length})
+                  </CardTitle>
+                </div>
+                <CardDescription className="text-blue-600">
+                  طلاب لديهم زي كحلي غير مدفوع
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {unpaidNavyUniforms.map((item) => (
+                    <div 
+                      key={item.uniform.id}
+                      className="flex items-center justify-between p-3 rounded-lg bg-white border border-blue-200"
+                    >
+                      <div>
+                        <Link href={`/students/${item.student.id}`} className="font-medium hover:underline text-blue-700">
+                          {item.student.name}
+                        </Link>
+                        <p className="text-sm text-zinc-500">
+                          تاريخ التسليم: {new Date(item.uniform.givenDate).toLocaleDateString("en-GB")}
+                          {item.uniform.price && ` • ${item.uniform.price} TL`}
+                        </p>
+                      </div>
+                      <Badge className="bg-blue-600">غير مدفوع</Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Unpaid Bus Subscriptions */}
+          {unpaidBusStudents.length > 0 && (
+            <Card className="border-orange-300 bg-orange-50">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-orange-600" />
+                  <CardTitle className="text-lg text-orange-700">
+                    اشتراك الباص غير مدفوع ({unpaidBusStudents.length})
+                  </CardTitle>
+                </div>
+                <CardDescription className="text-orange-600">
+                  طلاب لديهم اشتراك باص غير مدفوع
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {unpaidBusStudents.map((item) => (
+                    <div 
+                      key={item.student.id}
+                      className="flex items-center justify-between p-3 rounded-lg bg-white border border-orange-200"
+                    >
+                      <div>
+                        <Link href={`/students/${item.student.id}`} className="font-medium hover:underline text-orange-700">
+                          {item.student.name}
+                        </Link>
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                          <p className="text-sm text-zinc-500">
+                            رسوم الباص: {item.feeConfig.busFee} TL/شهر
+                          </p>
+                          {item.daysInfo && (
+                            <Badge variant="outline" className="text-orange-600 border-orange-300 text-[10px]">
+                              {item.daysInfo}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        {item.primaryContact?.phone && (
+                          <Button variant="ghost" size="sm" asChild>
+                            <a href={`tel:${item.primaryContact.phone}`}>
+                              <Phone className="h-4 w-4" />
+                            </a>
+                          </Button>
+                        )}
+                        <Button size="sm" asChild>
+                          <Link href={`/students/${item.student.id}/payment`}>دفع</Link>
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {overdueStudents.length === 0 && partialStudents.length === 0 && unpaidRedUniforms.length === 0 && unpaidNavyUniforms.length === 0 && unpaidBusStudents.length === 0 && (
             <Card className="bg-green-50 border-green-200">
               <CardContent className="py-8 text-center">
                 <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-3" />

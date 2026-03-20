@@ -129,10 +129,15 @@ function OverviewView({
                 <Star className="h-5 w-5 text-amber-600" />
               </div>
               <div>
-                <p className="text-xs text-zinc-500">معدل تقييم المدرب</p>
-                <p className={`text-xl font-bold ${scoreColor(totals.globalAvgCoach, 50)}`}>
-                  {totals.globalAvgCoach}<span className="text-sm text-zinc-400">/50</span>
-                </p>
+                <p className="text-xs text-zinc-500">معدل تقييم لاعب الشهر</p>
+                {(() => {
+                  const scaled = Math.round((totals.globalAvgCoach / 50) * 46 * 10) / 10;
+                  return (
+                    <p className={`text-xl font-bold ${scoreColor(scaled, 46)}`}>
+                      {scaled}<span className="text-sm text-zinc-400">/46</span>
+                    </p>
+                  );
+                })()}
               </div>
             </div>
           </CardContent>
@@ -145,9 +150,14 @@ function OverviewView({
               </div>
               <div>
                 <p className="text-xs text-zinc-500">معدل تقييم الوالدين</p>
-                <p className={`text-xl font-bold ${scoreColor(totals.globalAvgParent, 50)}`}>
-                  {totals.globalAvgParent}<span className="text-sm text-zinc-400">/50</span>
-                </p>
+                {(() => {
+                  const scaled = Math.round((totals.globalAvgParent / 50) * 46 * 10) / 10;
+                  return (
+                    <p className={`text-xl font-bold ${scoreColor(scaled, 46)}`}>
+                      {scaled}<span className="text-sm text-zinc-400">/46</span>
+                    </p>
+                  );
+                })()}
               </div>
             </div>
           </CardContent>
@@ -214,12 +224,12 @@ function OverviewView({
                   </th>
                   <th className="px-4 py-3 text-center font-medium">
                     <button onClick={() => toggleSort("coach")} className="flex items-center justify-center gap-1">
-                      المدرب /50 <SortIcon col="coach" />
+                      المدرب /46 <SortIcon col="coach" />
                     </button>
                   </th>
                   <th className="px-4 py-3 text-center font-medium">
                     <button onClick={() => toggleSort("parent")} className="flex items-center justify-center gap-1">
-                      الوالدين /50 <SortIcon col="parent" />
+                      الوالدين /46 <SortIcon col="parent" />
                     </button>
                   </th>
                   <th className="px-4 py-3 text-center font-medium">
@@ -260,8 +270,8 @@ function OverviewView({
                       </td>
                       <td className="px-4 py-3 text-center">
                         {s.avgCoach > 0 ? (
-                          <span className={`font-semibold ${scoreColor(s.avgCoach, 50)}`}>
-                            {s.avgCoach}
+                          <span className={`font-semibold ${scoreColor(Math.round((s.avgCoach / 50) * 46 * 10) / 10, 46)}`}>
+                            {Math.round((s.avgCoach / 50) * 46 * 10) / 10}
                           </span>
                         ) : (
                           <span className="text-zinc-300">—</span>
@@ -269,8 +279,8 @@ function OverviewView({
                       </td>
                       <td className="px-4 py-3 text-center">
                         {s.avgParent > 0 ? (
-                          <span className={`font-semibold ${scoreColor(s.avgParent, 50)}`}>
-                            {s.avgParent}
+                          <span className={`font-semibold ${scoreColor(Math.round((s.avgParent / 50) * 46 * 10) / 10, 46)}`}>
+                            {Math.round((s.avgParent / 50) * 46 * 10) / 10}
                           </span>
                         ) : (
                           <span className="text-zinc-300">—</span>
@@ -380,7 +390,7 @@ function DetailView({
       <div className="hidden print:block print:mb-4">
         <div className="flex items-center justify-between border-b-2 border-zinc-800 pb-3">
           <div>
-            <h1 className="text-2xl font-bold">⚽ أكاديمية Española</h1>
+            <h1 className="text-2xl font-bold">⚽  Española</h1>
             <p className="text-sm text-zinc-600">تقرير أداء اللاعب</p>
           </div>
           <div className="text-left text-sm text-zinc-600">
@@ -394,46 +404,67 @@ function DetailView({
         <Card>
           <CardContent className="p-4 text-center">
             <p className="text-xs text-zinc-500">معدل المدرب</p>
-            <p className={`text-2xl font-bold ${scoreColor(averages.coach, 50)}`}>
-              {averages.coach}<span className="text-sm text-zinc-400">/50</span>
-            </p>
-            <div className="mx-auto mt-2 h-2 w-full max-w-32 overflow-hidden rounded-full bg-zinc-100">
-              <div
-                className={`h-full rounded-full ${scoreBg(averages.coach, 50)}`}
-                style={{ width: `${(averages.coach / 50) * 100}%` }}
-              />
-            </div>
+            {(() => {
+              const scaled = Math.round((averages.coach / 50) * 46 * 10) / 10;
+              return (
+                <>
+                  <p className={`text-2xl font-bold ${scoreColor(scaled, 46)}`}>
+                    {scaled}<span className="text-sm text-zinc-400">/46</span>
+                  </p>
+                  <div className="mx-auto mt-2 h-2 w-full max-w-32 overflow-hidden rounded-full bg-zinc-100">
+                    <div
+                      className={`h-full rounded-full ${scoreBg(scaled, 46)}`}
+                      style={{ width: `${(scaled / 46) * 100}%` }}
+                    />
+                  </div>
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
             <p className="text-xs text-zinc-500">معدل الوالدين</p>
-            <p className={`text-2xl font-bold ${scoreColor(averages.parent, 50)}`}>
-              {averages.parent}<span className="text-sm text-zinc-400">/50</span>
-            </p>
-            <div className="mx-auto mt-2 h-2 w-full max-w-32 overflow-hidden rounded-full bg-zinc-100">
-              <div
-                className={`h-full rounded-full ${scoreBg(averages.parent, 50)}`}
-                style={{ width: `${(averages.parent / 50) * 100}%` }}
-              />
-            </div>
+            {(() => {
+              const scaled = Math.round((averages.parent / 50) * 46 * 10) / 10;
+              return (
+                <>
+                  <p className={`text-2xl font-bold ${scoreColor(scaled, 46)}`}>
+                    {scaled}<span className="text-sm text-zinc-400">/46</span>
+                  </p>
+                  <div className="mx-auto mt-2 h-2 w-full max-w-32 overflow-hidden rounded-full bg-zinc-100">
+                    <div
+                      className={`h-full rounded-full ${scoreBg(scaled, 46)}`}
+                      style={{ width: `${(scaled / 46) * 100}%` }}
+                    />
+                  </div>
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
             <p className="text-xs text-zinc-500">الحضور</p>
-            <p className={`text-2xl font-bold ${scoreColor(attendanceSummary.rate, 100)}`}>
-              {attendanceSummary.rate}%
-            </p>
-            <p className="mt-1 text-[10px] text-zinc-400">
-              {attendanceSummary.present} حضور من {attendanceSummary.total} حصة
-            </p>
-            <div className="mx-auto mt-1 h-2 w-full max-w-32 overflow-hidden rounded-full bg-zinc-100">
-              <div
-                className={`h-full rounded-full ${scoreBg(attendanceSummary.rate, 100)}`}
-                style={{ width: `${attendanceSummary.rate}%` }}
-              />
-            </div>
+            {(() => {
+              const attPoints = Math.min(attendanceSummary.present, 8);
+              return (
+                <>
+                  <p className={`text-2xl font-bold ${scoreColor(attPoints, 8)}`}>
+                    {attPoints}<span className="text-sm text-zinc-400">/8</span>
+                  </p>
+                  <p className="mt-1 text-[10px] text-zinc-400">
+                    {attendanceSummary.present} حضور من {attendanceSummary.total} حصة
+                  </p>
+                  <div className="mx-auto mt-1 h-2 w-full max-w-32 overflow-hidden rounded-full bg-zinc-100">
+                    <div
+                      className={`h-full rounded-full ${scoreBg(attPoints, 8)}`}
+                      style={{ width: `${(attPoints / 8) * 100}%` }}
+                    />
+                  </div>
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
         <Card>
@@ -499,28 +530,33 @@ function DetailView({
           <CardContent>
             <div className="flex items-end gap-2" style={{ minHeight: 220 }}>
               {trendData.map((rec) => {
-                const coachPct = rec.coach ? (rec.coach.grandTotal / 50) * 100 : 0;
-                const parentPct = rec.parent ? (rec.parent.grandTotal / 50) * 100 : 0;
-                const attPct = rec.attendance ? rec.attendance.rate : 0;
+                // Scale to contribution out of 100: coach(46) + parent(46) + attendance(8)
+                const scaledCoach = rec.coach ? Math.round((rec.coach.grandTotal / 50) * 46 * 10) / 10 : 0;
+                const scaledParent = rec.parent ? Math.round((rec.parent.grandTotal / 50) * 46 * 10) / 10 : 0;
+                const attPoints = rec.attendance ? Math.min(rec.attendance.present, 8) : 0;
+                // Bar heights based on percentage of max contribution
+                const coachPct = (scaledCoach / 46) * 100;
+                const parentPct = (scaledParent / 46) * 100;
+                const attPct = (attPoints / 8) * 100;
                 return (
                   <div key={`${rec.year}-${rec.month}`} className="flex flex-1 flex-col items-center gap-1">
                     <div className="flex w-full items-end justify-center gap-0.5" style={{ height: 170 }}>
                       <div className="relative flex w-4 flex-col items-center justify-end">
-                        <span className="mb-1 text-[9px] text-amber-600">{rec.coach?.grandTotal || 0}</span>
+                        <span className="mb-1 text-[9px] text-amber-600">{scaledCoach}</span>
                         <div
                           className="w-full rounded-t bg-amber-400"
                           style={{ height: `${Math.max(coachPct * 1.5, 4)}px` }}
                         />
                       </div>
                       <div className="relative flex w-4 flex-col items-center justify-end">
-                        <span className="mb-1 text-[9px] text-pink-600">{rec.parent?.grandTotal || 0}</span>
+                        <span className="mb-1 text-[9px] text-pink-600">{scaledParent}</span>
                         <div
                           className="w-full rounded-t bg-pink-400"
                           style={{ height: `${Math.max(parentPct * 1.5, 4)}px` }}
                         />
                       </div>
                       <div className="relative flex w-4 flex-col items-center justify-end">
-                        <span className="mb-1 text-[9px] text-emerald-600">{attPct}%</span>
+                        <span className="mb-1 text-[9px] text-emerald-600">{attPoints}</span>
                         <div
                           className="w-full rounded-t bg-emerald-400"
                           style={{ height: `${Math.max(attPct * 1.5, 4)}px` }}
@@ -539,13 +575,13 @@ function DetailView({
             </div>
             <div className="mt-3 flex items-center justify-center gap-4 text-xs text-zinc-500">
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded bg-amber-400" /> المدرب /50
+                <span className="inline-block h-2.5 w-2.5 rounded bg-amber-400" /> المدرب /46
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded bg-pink-400" /> الوالدين /50
+                <span className="inline-block h-2.5 w-2.5 rounded bg-pink-400" /> الوالدين /46
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded bg-emerald-400" /> الحضور %
+                <span className="inline-block h-2.5 w-2.5 rounded bg-emerald-400" /> الحضور /8
               </span>
             </div>
           </CardContent>
@@ -578,8 +614,8 @@ function DetailView({
                         <div className="text-center">
                           <p className="text-[10px] text-zinc-400">الحضور</p>
                           {rec.attendance ? (
-                            <p className={`font-semibold ${scoreColor(rec.attendance.rate, 100)}`}>
-                              {rec.attendance.rate}%
+                            <p className={`font-semibold ${scoreColor(Math.min(rec.attendance.present, 8), 8)}`}>
+                              {Math.min(rec.attendance.present, 8)}/8
                               <span className="text-[9px] text-zinc-400 mr-1">({rec.attendance.present}/{rec.attendance.total})</span>
                             </p>
                           ) : (
@@ -589,8 +625,8 @@ function DetailView({
                         <div className="text-center">
                           <p className="text-[10px] text-zinc-400">المدرب</p>
                           {rec.coach ? (
-                            <p className={`font-semibold ${scoreColor(rec.coach.grandTotal, 50)}`}>
-                              {rec.coach.grandTotal}/50
+                            <p className={`font-semibold ${scoreColor(Math.round((rec.coach.grandTotal / 50) * 46 * 10) / 10, 46)}`}>
+                              {Math.round((rec.coach.grandTotal / 50) * 46 * 10) / 10}/46
                             </p>
                           ) : (
                             <p className="text-zinc-300">—</p>
@@ -599,8 +635,8 @@ function DetailView({
                         <div className="text-center">
                           <p className="text-[10px] text-zinc-400">الوالدين</p>
                           {rec.parent ? (
-                            <p className={`font-semibold ${scoreColor(rec.parent.grandTotal, 50)}`}>
-                              {rec.parent.grandTotal}/50
+                            <p className={`font-semibold ${scoreColor(Math.round((rec.parent.grandTotal / 50) * 46 * 10) / 10, 46)}`}>
+                              {Math.round((rec.parent.grandTotal / 50) * 46 * 10) / 10}/46
                             </p>
                           ) : (
                             <p className="text-zinc-300">—</p>
@@ -628,7 +664,7 @@ function DetailView({
                           {/* Coach breakdown */}
                           <div className="space-y-3">
                             <h4 className="flex items-center gap-2 text-sm font-semibold text-amber-700">
-                              <Star className="h-4 w-4" /> تقييم المدرب
+                              <Star className="h-4 w-4" /> تقييم لاعب الشهر
                             </h4>
                             {rec.coach ? (
                               <div className="space-y-2 text-sm">
@@ -822,7 +858,7 @@ export function StudentReportsContent() {
         <div>
           <h1 className="text-2xl font-bold text-zinc-900">📊 تقارير أداء اللاعبين</h1>
           <p className="text-sm text-zinc-500">
-            تقييم المدرب + تقييم الوالدين + الحضور — عرض شامل لأداء كل لاعب على مدار الأشهر
+            تقييم لاعب الشهر + تقييم الوالدين + الحضور — عرض شامل لأداء كل لاعب على مدار الأشهر
           </p>
         </div>
       </div>
