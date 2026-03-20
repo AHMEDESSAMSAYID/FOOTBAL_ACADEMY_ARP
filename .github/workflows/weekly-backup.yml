@@ -32,17 +32,12 @@ jobs:
           /usr/lib/postgresql/17/bin/pg_dump --version
 
       - name: Export database with pg_dump
-        env:
-          PATH: /usr/lib/postgresql/17/bin:${{ env.PATH }}
         run: |
           echo "Exporting database..."
-          echo "pg_dump version: $(pg_dump --version)"
+          echo "pg_dump version: $(/usr/lib/postgresql/17/bin/pg_dump --version)"
           
-          # Clean DATABASE_URL - remove channel_binding parameter which pg_dump doesn't support
+          # Use DATABASE_URL directly - channel_binding is handled by libpq
           DB_URL="${{ secrets.DATABASE_URL }}"
-          DB_URL=$(echo "$DB_URL" | sed 's/&channel_binding=[^&]*//g' | sed 's/?channel_binding=[^&]*&/?/g' | sed 's/?channel_binding=[^&]*$//')
-          
-          echo "Cleaned URL (masked): postgresql://***@***/neondb?sslmode=require"
           
           echo "Testing database connection..."
           
