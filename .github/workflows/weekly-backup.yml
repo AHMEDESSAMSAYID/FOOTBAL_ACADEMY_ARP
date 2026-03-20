@@ -19,10 +19,15 @@ jobs:
           echo "BACKUP_FILE=espanyol-academy-backup-$DATE.sql.gz" >> $GITHUB_ENV
           echo "DATE=$DATE" >> $GITHUB_ENV
 
-      - name: Install PostgreSQL client
+      - name: Install PostgreSQL 17 client
         run: |
+          # Add PostgreSQL apt repository for version 17
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
           sudo apt-get update
-          sudo apt-get install -y postgresql-client
+          sudo apt-get install -y postgresql-client-17
+          # Verify version
+          pg_dump --version
 
       - name: Export database with pg_dump
         run: |
