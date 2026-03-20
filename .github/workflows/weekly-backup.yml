@@ -27,10 +27,32 @@ jobs:
       - name: Export database with pg_dump
         run: |
           echo "Exporting database..."
-          pg_dump "${{ secrets.DATABASE_URL }}" | gzip > ${{ env.BACKUP_FILE }}
+          echo "Testing database connection..."
+          
+          # Test connection first
+          if ! psql "${{ secrets.DATABASE_URL }}" -c "SELECT 1" > /dev/null 2>&1; then
+            echo "❌ Failed to connect to database!"
+            echo "Check your DATABASE_URL secret is correct"
+            exit 1
+          fi
+          
+          echo "✅ Database connection successful"
+          
+          # Export with verbose output
+          pg_dump "${{ secrets.DATABASE_URL }}" --verbose 2>&1 | gzip > ${{ env.BACKUP_FILE }}
+          
+          # Check file size
+          SIZE=$(stat -c%s ${{ env.BACKUP_FILE }})
+          echo "Backup file size: $SIZE bytes"
+          
+          if [ "$SIZE" -lt 100 ]; then
+            echo "❌ Backup file too small - pg_dump may have failed"
+            gunzip -c ${{ env.BACKUP_FILE }} || true
+            exit 1
+          fi
+          
+          echo "✅ Export successful"
           ls -lh ${{ env.BACKUP_FILE }}
-        env:
-          PGPASSWORD: ${{ secrets.DB_PASSWORD }}
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
