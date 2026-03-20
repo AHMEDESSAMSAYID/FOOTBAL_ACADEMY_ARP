@@ -27,10 +27,15 @@ jobs:
       - name: Export database with pg_dump
         run: |
           echo "Exporting database..."
+          
+          # Clean DATABASE_URL - remove channel_binding parameter which pg_dump doesn't support
+          DB_URL="${{ secrets.DATABASE_URL }}"
+          DB_URL=$(echo "$DB_URL" | sed 's/&channel_binding=[^&]*//g' | sed 's/?channel_binding=[^&]*&/?/g' | sed 's/?channel_binding=[^&]*$//')
+          
           echo "Testing database connection..."
           
           # Test connection first
-          if ! psql "${{ secrets.DATABASE_URL }}" -c "SELECT 1" > /dev/null 2>&1; then
+          if ! psql "$DB_URL" -c "SELECT 1" > /dev/null 2>&1; then
             echo "❌ Failed to connect to database!"
             echo "Check your DATABASE_URL secret is correct"
             exit 1
@@ -39,7 +44,7 @@ jobs:
           echo "✅ Database connection successful"
           
           # Export with verbose output
-          pg_dump "${{ secrets.DATABASE_URL }}" --verbose 2>&1 | gzip > ${{ env.BACKUP_FILE }}
+          pg_dump "$DB_URL" --verbose 2>&1 | gzip > ${{ env.BACKUP_FILE }}
           
           # Check file size
           SIZE=$(stat -c%s ${{ env.BACKUP_FILE }})
