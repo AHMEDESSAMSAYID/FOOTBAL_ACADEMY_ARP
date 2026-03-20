@@ -1,0 +1,43 @@
+name: Weekly Database Backup
+
+on:
+  schedule:
+    # Every Sunday at 3:00 AM UTC
+    - cron: '0 3 * * 0'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Neon CLI
+        run: npm install -g neonctl
+
+      - name: Create Backup Branch
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          echo "Creating backup branch: backup-$DATE"
+          neonctl branches create \
+            --name "backup-$DATE" \
+            --project-id ${{ secrets.NEON_PROJECT_ID }}
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+
+      - name: Cleanup Old Backups (keep last 4 weeks)
+        run: |
+          echo "Listing backup branches..."
+          BRANCHES=$(neonctl branches list --project-id ${{ secrets.NEON_PROJECT_ID }} --output json)
+          
+          # Get backup branches older than 28 days
+          echo "$BRANCHES" | jq -r '.[] | select(.name | startswith("backup-")) | .name' | while read branch; do
+            BRANCH_DATE=$(echo $branch | sed 's/backup-//')
+            BRANCH_TS=$(date -d "$BRANCH_DATE" +%s 2>/dev/null || echo 0)
+            CUTOFF_TS=$(date -d "28 days ago" +%s)
+            
+            if [ "$BRANCH_TS" -lt "$CUTOFF_TS" ] && [ "$BRANCH_TS" -ne 0 ]; then
+              echo "Deleting old backup: $branch"
+              neonctl branches delete $branch --project-id ${{ secrets.NEON_PROJECT_ID }} || true
+            fi
+          done
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
