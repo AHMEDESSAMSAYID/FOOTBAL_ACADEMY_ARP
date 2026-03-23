@@ -6,8 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   getStudentsReportOverview,
   getStudentDetailReport,
+  getAvailableMonths,
   type StudentReportSummary,
   type MonthlyRecord,
 } from "@/lib/actions/student-reports";
@@ -28,6 +36,7 @@ import {
   CalendarCheck,
   FileDown,
   MessageSquare,
+  Calendar,
 } from "lucide-react";
 
 // ===== PDF Export =====
@@ -820,6 +829,10 @@ export function StudentReportsContent() {
   const [view, setView] = useState<"overview" | "detail">("overview");
   const [loading, setLoading] = useState(true);
 
+  // Month filter
+  const [availableMonths, setAvailableMonths] = useState<{ year: number; month: number; label: string }[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState<string>("all"); // "all" or "year-month"
+
   const [students, setStudents] = useState<StudentReportSummary[]>([]);
   const [totals, setTotals] = useState({
     totalStudents: 0,
@@ -839,9 +852,23 @@ export function StudentReportsContent() {
   const [detailAverages, setDetailAverages] = useState({ coach: 0, parent: 0, combined: 0 });
   const [detailAttendance, setDetailAttendance] = useState({ present: 0, absent: 0, excused: 0, total: 0, rate: 0 });
 
-  const loadOverview = useCallback(async () => {
+  // Load available months on mount
+  useEffect(() => {
+    async function loadMonths() {
+      const result = await getAvailableMonths();
+      if (result.success && result.months) {
+        setAvailableMonths(result.months);
+      }
+    }
+    loadMonths();
+  }, []);
+
+  const loadOverview = useCallback(async (monthFilter?: string) => {
     setLoading(true);
-    const result = await getStudentsReportOverview();
+    const filter = monthFilter && monthFilter !== "all"
+      ? { year: parseInt(monthFilter.split("-")[0]), month: parseInt(monthFilter.split("-")[1]) }
+      : null;
+    const result = await getStudentsReportOverview(filter);
     if (result.success && result.students) {
       setStudents(result.students);
       setTotals(result.totals!);
@@ -850,8 +877,12 @@ export function StudentReportsContent() {
   }, []);
 
   useEffect(() => {
-    loadOverview();
-  }, [loadOverview]);
+    loadOverview(selectedMonth);
+  }, [loadOverview, selectedMonth]);
+
+  const handleMonthChange = (value: string) => {
+    setSelectedMonth(value);
+  };
 
   const handleSelectStudent = async (id: string) => {
     setLoading(true);
@@ -873,13 +904,31 @@ export function StudentReportsContent() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6">
-      <div className="flex items-center justify-between print:hidden">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between print:hidden">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900">📊 تقارير أداء اللاعبين</h1>
           <p className="text-sm text-zinc-500">
             تقييم لاعب الشهر + تقييم الوالدين + الحضور — عرض شامل لأداء كل لاعب على مدار الأشهر
           </p>
         </div>
+        {view === "overview" && (
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-zinc-500" />
+            <Select value={selectedMonth} onValueChange={handleMonthChange}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="اختر الشهر" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">الكل</SelectItem>
+                {availableMonths.map((m) => (
+                  <SelectItem key={`${m.year}-${m.month}`} value={`${m.year}-${m.month}`}>
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       {loading ? (

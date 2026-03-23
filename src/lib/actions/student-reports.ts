@@ -91,8 +91,40 @@ export interface StudentReportSummary {
   attendanceTotal: number;
 }
 
+// Get available months with data
+export async function getAvailableMonths() {
+  try {
+    const coachEvals = await db.select({ year: evaluations.year, month: evaluations.month }).from(evaluations);
+    const parentEvals = await db.select({ year: parentEvaluations.year, month: parentEvaluations.month }).from(parentEvaluations);
+    const attRecords = await db
+      .select({ sessionDate: trainingSessions.sessionDate })
+      .from(attendance)
+      .innerJoin(trainingSessions, eq(attendance.sessionId, trainingSessions.id));
+
+    const monthSet = new Set<string>();
+    coachEvals.forEach((e) => monthSet.add(`${e.year}-${e.month}`));
+    parentEvals.forEach((e) => monthSet.add(`${e.year}-${e.month}`));
+    attRecords.forEach((a) => {
+      const d = new Date(a.sessionDate);
+      monthSet.add(`${d.getFullYear()}-${d.getMonth() + 1}`);
+    });
+
+    const months = [...monthSet]
+      .map((key) => {
+        const [year, month] = key.split("-").map(Number);
+        return { year, month, label: `${MONTH_NAMES[month]} ${year}` };
+      })
+      .sort((a, b) => b.year - a.year || b.month - a.month);
+
+    return { success: true, months };
+  } catch (error) {
+    console.error("Error fetching available months:", error);
+    return { success: false, error: "فشل في تحميل الشهور المتاحة" };
+  }
+}
+
 // Get all students overview
-export async function getStudentsReportOverview() {
+export async function getStudentsReportOverview(filter?: { year: number; month: number } | null) {
   try {
     const activeStudents = await db
       .select({ id: students.id, name: students.name, ageGroup: students.ageGroup })
@@ -107,9 +139,31 @@ export async function getStudentsReportOverview() {
       .where(eq(parentEvaluations.isSubmitted, true));
 
     // Attendance data
-    const allAttendance = await db.select().from(attendance);
+    const allAttendance = await db
+      .select({
+        studentId: attendance.studentId,
+        status: attendance.status,
+        sessionDate: trainingSessions.sessionDate,
+      })
+      .from(attendance)
+      .innerJoin(trainingSessions, eq(attendance.sessionId, trainingSessions.id));
+
+    // Filter by month if provided
+    const filteredCoachEvals = filter
+      ? allCoachEvals.filter((e) => e.year === filter.year && e.month === filter.month)
+      : allCoachEvals;
+    const filteredParentEvals = filter
+      ? allParentEvals.filter((e) => e.year === filter.year && e.month === filter.month)
+      : allParentEvals;
+    const filteredAttendance = filter
+      ? allAttendance.filter((a) => {
+          const d = new Date(a.sessionDate);
+          return d.getFullYear() === filter.year && d.getMonth() + 1 === filter.month;
+        })
+      : allAttendance;
+
     const attByStudent = new Map<string, { present: number; total: number }>();
-    for (const a of allAttendance) {
+    for (const a of filteredAttendance) {
       if (!attByStudent.has(a.studentId)) attByStudent.set(a.studentId, { present: 0, total: 0 });
       const entry = attByStudent.get(a.studentId)!;
       entry.total++;
@@ -117,13 +171,13 @@ export async function getStudentsReportOverview() {
     }
 
     const coachByStudent = new Map<string, typeof allCoachEvals>();
-    for (const e of allCoachEvals) {
+    for (const e of filteredCoachEvals) {
       if (!coachByStudent.has(e.studentId)) coachByStudent.set(e.studentId, []);
       coachByStudent.get(e.studentId)!.push(e);
     }
 
     const parentByStudent = new Map<string, typeof allParentEvals>();
-    for (const e of allParentEvals) {
+    for (const e of filteredParentEvals) {
       if (!parentByStudent.has(e.studentId)) parentByStudent.set(e.studentId, []);
       parentByStudent.get(e.studentId)!.push(e);
     }

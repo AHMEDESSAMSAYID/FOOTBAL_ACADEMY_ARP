@@ -10,6 +10,12 @@
   --primary-foreground: #fafafa;
   --accent: #f4f4f5;
   --accent-foreground: #18181b;
+  --popover: #ffffff;
+  --popover-foreground: #171717;
+  --card: #ffffff;
+  --card-foreground: #171717;
+  --input: #e4e4e7;
+  --ring: #18181b;
 }
 
 @theme inline {
@@ -20,6 +26,14 @@
   --color-border: var(--border);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
   --font-arabic: var(--font-ibm-plex-arabic);
 }
 
