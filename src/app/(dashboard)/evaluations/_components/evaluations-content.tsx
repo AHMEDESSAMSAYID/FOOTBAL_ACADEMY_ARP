@@ -14,10 +14,12 @@ import {
   Trophy,
   X,
   Loader2,
+  RotateCcw,
 } from "lucide-react";
 import {
   getStudentsWithEvaluations,
   createEvaluation,
+  deleteEvaluation,
 } from "@/lib/actions/evaluations";
 import { toast } from "sonner";
 
@@ -230,7 +232,31 @@ export function EvaluationsContent() {
             <span className="text-sm text-zinc-500">({selectedStudent.ageGroup})</span>
           )}
           {selectedStudent.evaluation && (
-            <Badge className="mt-2 bg-amber-100 text-amber-700">تم التقييم مسبقاً</Badge>
+            <div className="mt-3 space-y-2">
+              <Badge className="bg-amber-100 text-amber-700">تم التقييم مسبقاً</Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-1 mx-auto text-red-600 border-red-200 hover:bg-red-50"
+                disabled={isPending}
+                onClick={async () => {
+                  if (!confirm("هل أنت متأكد من إعادة تعيين تقييم هذا اللاعب؟")) return;
+                  startTransition(async () => {
+                    const result = await deleteEvaluation(selectedStudent.evaluation!.id);
+                    if (result.success) {
+                      toast.success("تم إعادة تعيين التقييم");
+                      setSelectedStudent(null);
+                      loadData();
+                    } else {
+                      toast.error(result.error || "فشل في إعادة التعيين");
+                    }
+                  });
+                }}
+              >
+                {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
+                إعادة تعيين
+              </Button>
+            </div>
           )}
         </div>
 
