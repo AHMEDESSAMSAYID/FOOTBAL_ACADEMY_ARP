@@ -325,7 +325,7 @@ export async function sendAttendanceSms(
           ? "غائب ❌"
           : "معذور ⚠️";
 
-    const message = `أكاديمية Española\n\nتم تسجيل حضور الطالب/ة ${studentName}\nالحالة: ${statusText}\n\nشكراً لكم`;
+    const message = ` Española\n\nتم تسجيل حضور الطالب/ة ${studentName}\nالحالة: ${statusText}\n\nشكراً لكم`;
 
     return await sendSmsToParents(studentId, message);
   } catch (error) {

@@ -12,7 +12,7 @@ const ibmPlexArabic = IBM_Plex_Sans_Arabic({
 });
 
 export const metadata: Metadata = {
-  title: "أكاديمية Española",
+  title: "Española",
   description: "نظام إدارة أكاديمية كرة القدم",
 };
 

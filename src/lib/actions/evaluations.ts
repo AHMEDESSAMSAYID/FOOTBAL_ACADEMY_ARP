@@ -5,24 +5,21 @@ import { evaluations, students } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
+// New 4-criteria evaluation system (/50 total):
+// 1️⃣ الانضباطية (15): تنفيذ تعليمات المدرب
+// 2️⃣ الأخلاق (15): احترام (10) + اللعب النظيف (5)
+// 3️⃣ المستوى الفني (20): التطور المهاري والأداء البدني
 interface CreateEvaluationInput {
   studentId: string;
   month: number;
   year: number;
-  // Technical
-  ballControl: number;
-  passing: number;
-  shooting: number;
-  // Physical
-  speed: number;
-  fitness: number;
-  // Tactical
-  positioning: number;
-  gameAwareness: number;
-  // Attitude
-  commitment: number;
-  teamwork: number;
-  discipline: number;
+  // 1️⃣ الانضباطية – 15 درجة
+  coachInstructions: number; // تنفيذ تعليمات المدرب (1-15)
+  // 2️⃣ الأخلاق – 15 درجة
+  respectScore: number; // احترام المدربين والإدارة والزملاء (1-10)
+  fairPlayScore: number; // اللعب النظيف والروح الرياضية (1-5)
+  // 3️⃣ المستوى الفني – 20 درجة
+  technicalProgress: number; // التطور المهاري والأداء البدني (1-20)
   notes?: string;
 }
 
@@ -40,25 +37,17 @@ export async function createEvaluation(input: CreateEvaluationInput) {
       return { success: false, error: "يوجد تقييم لهذا الشهر بالفعل" };
     }
 
-    const grandTotal = input.ballControl + input.passing + input.shooting
-      + input.speed + input.fitness
-      + input.positioning + input.gameAwareness
-      + input.commitment + input.teamwork + input.discipline;
+    // Calculate grand total (15 + 10 + 5 + 20 = 50)
+    const grandTotal = input.coachInstructions + input.respectScore + input.fairPlayScore + input.technicalProgress;
 
     const [evaluation] = await db.insert(evaluations).values({
       studentId: input.studentId,
       month: input.month,
       year: input.year,
-      ballControl: input.ballControl,
-      passing: input.passing,
-      shooting: input.shooting,
-      speed: input.speed,
-      fitness: input.fitness,
-      positioning: input.positioning,
-      gameAwareness: input.gameAwareness,
-      commitment: input.commitment,
-      teamwork: input.teamwork,
-      discipline: input.discipline,
+      coachInstructions: input.coachInstructions,
+      respectScore: input.respectScore,
+      fairPlayScore: input.fairPlayScore,
+      technicalProgress: input.technicalProgress,
       grandTotal,
       notes: input.notes,
     }).returning();
@@ -75,16 +64,19 @@ export async function createEvaluation(input: CreateEvaluationInput) {
 export async function updateEvaluation(id: string, input: Partial<CreateEvaluationInput>) {
   try {
     const updateData: Record<string, unknown> = { ...input, updatedAt: new Date() };
+    
     // Recalculate grandTotal if any score field is present
-    if (input.ballControl !== undefined || input.passing !== undefined) {
-      // Need full record to recalculate
+    if (input.coachInstructions !== undefined || input.respectScore !== undefined || 
+        input.fairPlayScore !== undefined || input.technicalProgress !== undefined) {
       const [existing] = await db.select().from(evaluations).where(eq(evaluations.id, id));
       if (existing) {
-        const merged = { ...existing, ...input };
-        updateData.grandTotal = merged.ballControl + merged.passing + merged.shooting
-          + merged.speed + merged.fitness
-          + merged.positioning + merged.gameAwareness
-          + merged.commitment + merged.teamwork + merged.discipline;
+        const merged = {
+          coachInstructions: input.coachInstructions ?? existing.coachInstructions ?? 0,
+          respectScore: input.respectScore ?? existing.respectScore ?? 0,
+          fairPlayScore: input.fairPlayScore ?? existing.fairPlayScore ?? 0,
+          technicalProgress: input.technicalProgress ?? existing.technicalProgress ?? 0,
+        };
+        updateData.grandTotal = merged.coachInstructions + merged.respectScore + merged.fairPlayScore + merged.technicalProgress;
       }
     }
 

@@ -10,28 +10,46 @@ const MONTH_NAMES: Record<number, string> = {
   9: "سبتمبر", 10: "أكتوبر", 11: "نوفمبر", 12: "ديسمبر",
 };
 
+// New evaluation system coach data
+interface NewCoachEval {
+  grandTotal: number;
+  coachInstructions: number;
+  respectScore: number;
+  fairPlayScore: number;
+  technicalProgress: number;
+  disciplineTotal: number;
+  ethicsTotal: number;
+  technicalTotal: number;
+  notes: string | null;
+  isNewSystem: true;
+}
+
+// Legacy evaluation system coach data
+interface LegacyCoachEval {
+  grandTotal: number;
+  ballControl: number;
+  passing: number;
+  shooting: number;
+  speed: number;
+  fitness: number;
+  positioning: number;
+  gameAwareness: number;
+  commitment: number;
+  teamwork: number;
+  discipline: number;
+  technicalTotal: number;
+  physicalTotal: number;
+  tacticalTotal: number;
+  attitudeTotal: number;
+  notes: string | null;
+  isNewSystem: false;
+}
+
 export interface MonthlyRecord {
   month: number;
   year: number;
   label: string;
-  coach: {
-    grandTotal: number;
-    ballControl: number;
-    passing: number;
-    shooting: number;
-    speed: number;
-    fitness: number;
-    positioning: number;
-    gameAwareness: number;
-    commitment: number;
-    teamwork: number;
-    discipline: number;
-    technicalTotal: number;
-    physicalTotal: number;
-    tacticalTotal: number;
-    attitudeTotal: number;
-    notes: string | null;
-  } | null;
+  coach: NewCoachEval | LegacyCoachEval | null;
   parent: {
     grandTotal: number;
     disciplineTotal: number;
@@ -282,24 +300,45 @@ export async function getStudentDetailReport(studentId: string) {
         });
       }
       const rec = monthMap.get(key)!;
-      rec.coach = {
-        grandTotal: e.grandTotal,
-        ballControl: e.ballControl,
-        passing: e.passing,
-        shooting: e.shooting,
-        speed: e.speed,
-        fitness: e.fitness,
-        positioning: e.positioning,
-        gameAwareness: e.gameAwareness,
-        commitment: e.commitment,
-        teamwork: e.teamwork,
-        discipline: e.discipline,
-        technicalTotal: e.ballControl + e.passing + e.shooting,
-        physicalTotal: e.speed + e.fitness,
-        tacticalTotal: e.positioning + e.gameAwareness,
-        attitudeTotal: e.commitment + e.teamwork + e.discipline,
-        notes: e.notes,
-      };
+      
+      // New evaluation system (4 criteria)
+      if (e.coachInstructions !== null) {
+        rec.coach = {
+          grandTotal: e.grandTotal,
+          // New fields
+          coachInstructions: e.coachInstructions ?? 0,
+          respectScore: e.respectScore ?? 0,
+          fairPlayScore: e.fairPlayScore ?? 0,
+          technicalProgress: e.technicalProgress ?? 0,
+          // Category totals for new system
+          disciplineTotal: e.coachInstructions ?? 0,
+          ethicsTotal: (e.respectScore ?? 0) + (e.fairPlayScore ?? 0),
+          technicalTotal: e.technicalProgress ?? 0,
+          notes: e.notes,
+          isNewSystem: true,
+        } as NewCoachEval;
+      } else {
+        // Legacy evaluation system (10 KPIs) - for backward compatibility
+        rec.coach = {
+          grandTotal: e.grandTotal,
+          ballControl: e.ballControl ?? 0,
+          passing: e.passing ?? 0,
+          shooting: e.shooting ?? 0,
+          speed: e.speed ?? 0,
+          fitness: e.fitness ?? 0,
+          positioning: e.positioning ?? 0,
+          gameAwareness: e.gameAwareness ?? 0,
+          commitment: e.commitment ?? 0,
+          teamwork: e.teamwork ?? 0,
+          discipline: e.discipline ?? 0,
+          technicalTotal: (e.ballControl ?? 0) + (e.passing ?? 0) + (e.shooting ?? 0),
+          physicalTotal: (e.speed ?? 0) + (e.fitness ?? 0),
+          tacticalTotal: (e.positioning ?? 0) + (e.gameAwareness ?? 0),
+          attitudeTotal: (e.commitment ?? 0) + (e.teamwork ?? 0) + (e.discipline ?? 0),
+          notes: e.notes,
+          isNewSystem: false,
+        } as LegacyCoachEval;
+      }
     }
 
     for (const e of parentEvals) {

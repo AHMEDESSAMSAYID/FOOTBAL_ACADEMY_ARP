@@ -668,24 +668,43 @@ function DetailView({
                             </h4>
                             {rec.coach ? (
                               <div className="space-y-2 text-sm">
-                                <CategoryRow label="التقنية" score={rec.coach.technicalTotal} max={15} items={[
-                                  { label: "التحكم بالكرة", score: rec.coach.ballControl, max: 5 },
-                                  { label: "التمرير", score: rec.coach.passing, max: 5 },
-                                  { label: "التسديد", score: rec.coach.shooting, max: 5 },
-                                ]} />
-                                <CategoryRow label="البدنية" score={rec.coach.physicalTotal} max={10} items={[
-                                  { label: "السرعة", score: rec.coach.speed, max: 5 },
-                                  { label: "اللياقة", score: rec.coach.fitness, max: 5 },
-                                ]} />
-                                <CategoryRow label="التكتيكية" score={rec.coach.tacticalTotal} max={10} items={[
-                                  { label: "التمركز", score: rec.coach.positioning, max: 5 },
-                                  { label: "الوعي", score: rec.coach.gameAwareness, max: 5 },
-                                ]} />
-                                <CategoryRow label="السلوك" score={rec.coach.attitudeTotal} max={15} items={[
-                                  { label: "الالتزام", score: rec.coach.commitment, max: 5 },
-                                  { label: "العمل الجماعي", score: rec.coach.teamwork, max: 5 },
-                                  { label: "الانضباط", score: rec.coach.discipline, max: 5 },
-                                ]} />
+                                {rec.coach.isNewSystem ? (
+                                  // New 4-criteria system
+                                  <>
+                                    <CategoryRow label="الانضباطية" score={rec.coach.disciplineTotal} max={15} items={[
+                                      { label: "تنفيذ تعليمات المدرب", score: rec.coach.coachInstructions, max: 15 },
+                                    ]} />
+                                    <CategoryRow label="الأخلاق" score={rec.coach.ethicsTotal} max={15} items={[
+                                      { label: "الاحترام", score: rec.coach.respectScore, max: 10 },
+                                      { label: "اللعب النظيف", score: rec.coach.fairPlayScore, max: 5 },
+                                    ]} />
+                                    <CategoryRow label="المستوى الفني" score={rec.coach.technicalTotal} max={20} items={[
+                                      { label: "التطور المهاري والأداء البدني", score: rec.coach.technicalProgress, max: 20 },
+                                    ]} />
+                                  </>
+                                ) : (
+                                  // Legacy 10-KPI system
+                                  <>
+                                    <CategoryRow label="التقنية" score={'technicalTotal' in rec.coach ? rec.coach.technicalTotal : 0} max={15} items={[
+                                      { label: "التحكم بالكرة", score: 'ballControl' in rec.coach ? rec.coach.ballControl : 0, max: 5 },
+                                      { label: "التمرير", score: 'passing' in rec.coach ? rec.coach.passing : 0, max: 5 },
+                                      { label: "التسديد", score: 'shooting' in rec.coach ? rec.coach.shooting : 0, max: 5 },
+                                    ]} />
+                                    <CategoryRow label="البدنية" score={'physicalTotal' in rec.coach ? rec.coach.physicalTotal : 0} max={10} items={[
+                                      { label: "السرعة", score: 'speed' in rec.coach ? rec.coach.speed : 0, max: 5 },
+                                      { label: "اللياقة", score: 'fitness' in rec.coach ? rec.coach.fitness : 0, max: 5 },
+                                    ]} />
+                                    <CategoryRow label="التكتيكية" score={'tacticalTotal' in rec.coach ? rec.coach.tacticalTotal : 0} max={10} items={[
+                                      { label: "التمركز", score: 'positioning' in rec.coach ? rec.coach.positioning : 0, max: 5 },
+                                      { label: "الوعي", score: 'gameAwareness' in rec.coach ? rec.coach.gameAwareness : 0, max: 5 },
+                                    ]} />
+                                    <CategoryRow label="السلوك" score={'attitudeTotal' in rec.coach ? rec.coach.attitudeTotal : 0} max={15} items={[
+                                      { label: "الالتزام", score: 'commitment' in rec.coach ? rec.coach.commitment : 0, max: 5 },
+                                      { label: "العمل الجماعي", score: 'teamwork' in rec.coach ? rec.coach.teamwork : 0, max: 5 },
+                                      { label: "الانضباط", score: 'discipline' in rec.coach ? rec.coach.discipline : 0, max: 5 },
+                                    ]} />
+                                  </>
+                                )}
                                 {rec.coach.notes && (
                                   <p className="mt-2 rounded bg-amber-50 p-2 text-xs text-amber-800">
                                     ملاحظات: {rec.coach.notes}

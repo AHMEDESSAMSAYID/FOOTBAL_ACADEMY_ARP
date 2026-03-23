@@ -343,27 +343,38 @@ export const escalationLogs = pgTable('escalation_logs', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-// Evaluations table (Coach Performance Tracking — 10 KPIs × 1-5 stars = /50)
+// Evaluations table (Coach Performance Tracking — 4 criteria = /50)
+// 1️⃣ الانضباطية (15): تنفيذ تعليمات المدرب
+// 2️⃣ الأخلاق (15): احترام (10) + اللعب النظيف (5)
+// 3️⃣ المستوى الفني (20): التطور المهاري والأداء البدني
 export const evaluations = pgTable('evaluations', {
   id: uuid('id').primaryKey().defaultRandom(),
   studentId: uuid('student_id').notNull().references(() => students.id, { onDelete: 'cascade' }),
   coachId: uuid('coach_id').references(() => users.id),
   month: integer('month').notNull(), // 1-12
   year: integer('year').notNull(),
-  // التقنية Technical (3 criteria, /15)
-  ballControl: integer('ball_control').notNull(), // التحكم بالكرة
-  passing: integer('passing').notNull(), // التمرير
-  shooting: integer('shooting').notNull(), // التسديد
-  // البدنية Physical (2 criteria, /10)
-  speed: integer('speed').notNull(), // السرعة
-  fitness: integer('fitness').notNull(), // اللياقة
-  // التكتيكية Tactical (2 criteria, /10)
-  positioning: integer('positioning').notNull(), // التمركز
-  gameAwareness: integer('game_awareness').notNull(), // الوعي بالملعب
-  // السلوك Attitude (3 criteria, /15)
-  commitment: integer('commitment').notNull(), // الالتزام
-  teamwork: integer('teamwork').notNull(), // العمل الجماعي
-  discipline: integer('discipline').notNull(), // الانضباط
+  
+  // ===== NEW EVALUATION SYSTEM (4 criteria, /50) =====
+  // 1️⃣ الانضباطية – 15 درجة
+  coachInstructions: integer('coach_instructions'), // تنفيذ تعليمات المدرب (1-15)
+  // 2️⃣ الأخلاق – 15 درجة
+  respectScore: integer('respect_score'), // احترام المدربين والإدارة والزملاء (1-10)
+  fairPlayScore: integer('fair_play_score'), // اللعب النظيف والروح الرياضية (1-5)
+  // 3️⃣ المستوى الفني – 20 درجة
+  technicalProgress: integer('technical_progress'), // التطور المهاري والأداء البدني (1-20)
+  
+  // ===== LEGACY FIELDS (nullable for old data) =====
+  ballControl: integer('ball_control'), // التحكم بالكرة
+  passing: integer('passing'), // التمرير
+  shooting: integer('shooting'), // التسديد
+  speed: integer('speed'), // السرعة
+  fitness: integer('fitness'), // اللياقة
+  positioning: integer('positioning'), // التمركز
+  gameAwareness: integer('game_awareness'), // الوعي بالملعب
+  commitment: integer('commitment'), // الالتزام
+  teamwork: integer('teamwork'), // العمل الجماعي
+  discipline: integer('discipline'), // الانضباط
+  
   // Totals
   grandTotal: integer('grand_total').notNull(), // /50
   notes: text('notes'),

@@ -5,15 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Star,
   Search,
   ChevronRight,
   Check,
   ArrowRight,
-  Trophy,
-  Dumbbell,
-  Brain,
+  ClipboardCheck,
   Heart,
+  Trophy,
   X,
   Loader2,
 } from "lucide-react";
@@ -30,8 +28,6 @@ const MONTHS = [
   { value: 10, label: "أكتوبر" }, { value: 11, label: "نوفمبر" }, { value: 12, label: "ديسمبر" },
 ];
 
-const ratingLabels = ["", "ضعيف", "مقبول", "جيد", "جيد جداً", "ممتاز"];
-
 interface StudentWithEval {
   id: string;
   name: string;
@@ -39,81 +35,62 @@ interface StudentWithEval {
   evaluation: {
     id: string;
     grandTotal: number;
-    ballControl: number;
-    passing: number;
-    shooting: number;
-    speed: number;
-    fitness: number;
-    positioning: number;
-    gameAwareness: number;
-    commitment: number;
-    teamwork: number;
-    discipline: number;
+    coachInstructions: number | null;
+    respectScore: number | null;
+    fairPlayScore: number | null;
+    technicalProgress: number | null;
     notes: string | null;
   } | null;
 }
 
-// KPI categories config
+// New 4-criteria evaluation system (/50 total)
+// 1️⃣ الانضباطية (15): تنفيذ تعليمات المدرب
+// 2️⃣ الأخلاق (15): احترام (10) + اللعب النظيف (5)
+// 3️⃣ المستوى الفني (20): التطور المهاري والأداء البدني
 const categories = [
   {
-    key: "technical",
-    label: "التقنية",
-    icon: <Trophy className="h-4 w-4" />,
+    key: "discipline",
+    label: "1️⃣ الانضباطية",
+    icon: <ClipboardCheck className="h-4 w-4" />,
     color: "text-blue-600",
     bgColor: "bg-blue-600",
     max: 15,
     items: [
-      { key: "ballControl", label: "التحكم بالكرة", max: 5 },
-      { key: "passing", label: "التمرير", max: 5 },
-      { key: "shooting", label: "التسديد", max: 5 },
+      { key: "coachInstructions", label: "تنفيذ تعليمات المدرب", max: 15 },
     ],
   },
   {
-    key: "physical",
-    label: "البدنية",
-    icon: <Dumbbell className="h-4 w-4" />,
-    color: "text-green-600",
-    bgColor: "bg-green-600",
-    max: 10,
-    items: [
-      { key: "speed", label: "السرعة", max: 5 },
-      { key: "fitness", label: "اللياقة", max: 5 },
-    ],
-  },
-  {
-    key: "tactical",
-    label: "التكتيكية",
-    icon: <Brain className="h-4 w-4" />,
-    color: "text-purple-600",
-    bgColor: "bg-purple-600",
-    max: 10,
-    items: [
-      { key: "positioning", label: "التمركز", max: 5 },
-      { key: "gameAwareness", label: "الوعي بالملعب", max: 5 },
-    ],
-  },
-  {
-    key: "attitude",
-    label: "السلوك",
+    key: "ethics",
+    label: "2️⃣ الأخلاق",
     icon: <Heart className="h-4 w-4" />,
-    color: "text-red-600",
-    bgColor: "bg-red-600",
+    color: "text-rose-600",
+    bgColor: "bg-rose-600",
     max: 15,
     items: [
-      { key: "commitment", label: "الالتزام", max: 5 },
-      { key: "teamwork", label: "العمل الجماعي", max: 5 },
-      { key: "discipline", label: "الانضباط", max: 5 },
+      { key: "respectScore", label: "احترام المدربين والإدارة والزملاء", max: 10 },
+      { key: "fairPlayScore", label: "اللعب النظيف والروح الرياضية", max: 5 },
+    ],
+  },
+  {
+    key: "technical",
+    label: "3️⃣ المستوى الفني",
+    icon: <Trophy className="h-4 w-4" />,
+    color: "text-amber-600",
+    bgColor: "bg-amber-600",
+    max: 20,
+    items: [
+      { key: "technicalProgress", label: "التطور المهاري والأداء البدني خلال الشهر", max: 20 },
     ],
   },
 ];
 
-type ScoreKeys = "ballControl" | "passing" | "shooting" | "speed" | "fitness" | "positioning" | "gameAwareness" | "commitment" | "teamwork" | "discipline";
+type ScoreKeys = "coachInstructions" | "respectScore" | "fairPlayScore" | "technicalProgress";
 
 const defaultScores: Record<ScoreKeys, number> = {
-  ballControl: 3, passing: 3, shooting: 3,
-  speed: 3, fitness: 3,
-  positioning: 3, gameAwareness: 3,
-  commitment: 3, teamwork: 3, discipline: 3,
+  coachInstructions: 10,
+  respectScore: 7,
+  fairPlayScore: 3,
+  technicalProgress: 14,
 };
 
 export function EvaluationsContent() {
@@ -154,10 +131,10 @@ export function EvaluationsContent() {
       // Pre-fill with existing evaluation
       const e = student.evaluation;
       setScores({
-        ballControl: e.ballControl, passing: e.passing, shooting: e.shooting,
-        speed: e.speed, fitness: e.fitness,
-        positioning: e.positioning, gameAwareness: e.gameAwareness,
-        commitment: e.commitment, teamwork: e.teamwork, discipline: e.discipline,
+        coachInstructions: e.coachInstructions ?? 10,
+        respectScore: e.respectScore ?? 7,
+        fairPlayScore: e.fairPlayScore ?? 3,
+        technicalProgress: e.technicalProgress ?? 14,
       });
       setNotes(e.notes || "");
     } else {
@@ -268,17 +245,24 @@ export function EvaluationsContent() {
                     <span className={cat.color}>{cat.icon}</span>
                     {cat.label}
                   </div>
-                  <span className="text-xs font-normal text-zinc-500">{catTotal} / {cat.max}</span>
+                  <span className="text-base font-bold">{catTotal} / {cat.max}</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-4">
                 {cat.items.map(item => (
-                  <div key={item.key} className="flex items-center justify-between">
-                    <span className="text-sm text-zinc-700">{item.label}</span>
-                    <StarRating
+                  <div key={item.key} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-zinc-700">{item.label}</span>
+                      <span className="text-sm font-semibold text-zinc-900">
+                        {scores[item.key as ScoreKeys]} / {item.max}
+                      </span>
+                    </div>
+                    <ScoreSlider
                       value={scores[item.key as ScoreKeys]}
+                      max={item.max}
                       onChange={(v) => setScore(item.key as ScoreKeys, v)}
                       readOnly={!!selectedStudent.evaluation}
+                      color={cat.bgColor}
                     />
                   </div>
                 ))}
@@ -449,28 +433,42 @@ export function EvaluationsContent() {
   );
 }
 
-// ===== Star Rating Component =====
-function StarRating({ value, onChange, readOnly = false }: {
+// ===== Score Slider Component =====
+function ScoreSlider({ value, max, onChange, readOnly = false, color }: {
   value: number;
+  max: number;
   onChange?: (v: number) => void;
   readOnly?: boolean;
+  color: string;
 }) {
+  const percentage = (value / max) * 100;
+  const bgColorMap: Record<string, string> = {
+    "bg-blue-600": "#2563eb",
+    "bg-rose-600": "#e11d48",
+    "bg-amber-600": "#d97706",
+  };
+  const bgColorHex = bgColorMap[color] || "#3b82f6";
+  
   return (
-    <div className="flex items-center gap-1">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <button
-          key={star}
-          type="button"
-          disabled={readOnly}
-          onClick={() => onChange?.(star)}
-          className={`transition-colors ${readOnly ? "cursor-default" : "cursor-pointer hover:text-amber-400"}`}
-        >
-          <Star
-            className={`h-5 w-5 ${star <= value ? "fill-amber-400 text-amber-400" : "text-zinc-300"}`}
-          />
-        </button>
-      ))}
-      <span className="text-xs text-zinc-500 ms-1 w-12">{ratingLabels[value]}</span>
+    <div className="relative">
+      <input
+        type="range"
+        min={1}
+        max={max}
+        value={value}
+        disabled={readOnly}
+        onChange={(e) => onChange?.(Number(e.target.value))}
+        className={`w-full h-3 rounded-full appearance-none cursor-pointer disabled:opacity-70 disabled:cursor-default
+          [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 
+          [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-zinc-400
+          [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md
+          [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:bg-white 
+          [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-zinc-400 [&::-moz-range-thumb]:rounded-full 
+          [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md`}
+        style={{
+          background: `linear-gradient(to left, ${bgColorHex} ${percentage}%, #e4e4e7 ${percentage}%)`,
+        }}
+      />
     </div>
   );
 }
