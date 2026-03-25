@@ -1,8 +1,8 @@
 "use server";
 
 import { db } from "@/db";
-import { parentEvaluations, students, surveys } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { parentEvaluations, students, surveys, attendance, trainingSessions } from "@/db/schema";
+import { eq, and, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 function generateToken(): string {
@@ -62,14 +62,27 @@ export async function getSurveyByToken(token: string) {
       return { success: false, error: "هذا التقييم مغلق" };
     }
 
-    // Get all active students
-    const activeStudents = await db
+    // Get all students who have attendance in the survey's month/year
+    // Create date range for the month
+    const startDate = new Date(survey.year, survey.month - 1, 1).toISOString().split('T')[0]; // YYYY-MM-01
+    const endDate = new Date(survey.year, survey.month, 0).toISOString().split('T')[0]; // YYYY-MM-31 (or 30, 29, 28)
+
+    // Get students with attendance in the survey's month (boolean: yes/no)
+    const studentList = await db
       .select({ id: students.id, name: students.name, ageGroup: students.ageGroup })
       .from(students)
-      .where(eq(students.status, "active"))
+      .where(
+        sql`EXISTS (
+          SELECT 1 FROM ${attendance}
+          INNER JOIN ${trainingSessions} ON ${attendance.sessionId} = ${trainingSessions.id}
+          WHERE ${attendance.studentId} = ${students.id}
+          AND ${trainingSessions.sessionDate} BETWEEN ${startDate} AND ${endDate}
+          LIMIT 1
+        )`
+      )
       .orderBy(students.name);
 
-    // Get already submitted student IDs
+    // Get already submitted student IDs for this survey
     const submittedEvals = await db
       .select({ studentId: parentEvaluations.studentId })
       .from(parentEvaluations)
@@ -90,7 +103,7 @@ export async function getSurveyByToken(token: string) {
         year: survey.year,
         monthName: MONTH_NAMES[survey.month] || "",
       },
-      students: activeStudents.map(s => ({
+      students: studentList.map(s => ({
         id: s.id,
         name: s.name,
         ageGroup: s.ageGroup,

@@ -1,8 +1,8 @@
 "use server";
 
 import { db } from "@/db";
-import { evaluations, students } from "@/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { evaluations, students, attendance, trainingSessions } from "@/db/schema";
+import { eq, and, desc, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 // New 4-criteria evaluation system (/50 total):
@@ -139,15 +139,29 @@ export async function deleteEvaluation(id: string) {
   }
 }
 
-// Get all students with their latest evaluation for the evaluations page
+// Get students with attendance in the selected month for evaluations page
 export async function getStudentsWithEvaluations(month: number, year: number) {
   try {
-    const activeStudents = await db
+    // Create date range for the month
+    const startDate = new Date(year, month - 1, 1).toISOString().split('T')[0]; // YYYY-MM-01
+    const endDate = new Date(year, month, 0).toISOString().split('T')[0]; // YYYY-MM-31 (or 30, 29, 28)
+
+    // Get students who have attendance in the selected month (using subquery EXISTS)
+    const studentList = await db
       .select({ id: students.id, name: students.name, ageGroup: students.ageGroup })
       .from(students)
-      .where(eq(students.status, "active"))
+      .where(
+        sql`EXISTS (
+          SELECT 1 FROM ${attendance}
+          INNER JOIN ${trainingSessions} ON ${attendance.sessionId} = ${trainingSessions.id}
+          WHERE ${attendance.studentId} = ${students.id}
+          AND ${trainingSessions.sessionDate} BETWEEN ${startDate} AND ${endDate}
+          LIMIT 1
+        )`
+      )
       .orderBy(students.name);
 
+    // Get evaluations for this month
     const monthEvals = await db
       .select()
       .from(evaluations)
@@ -155,14 +169,19 @@ export async function getStudentsWithEvaluations(month: number, year: number) {
 
     const evalMap = new Map(monthEvals.map(e => [e.studentId, e]));
 
+    // Map students with their evaluations
+    const studentsWithEval = studentList.map(s => ({
+      id: s.id,
+      name: s.name,
+      ageGroup: s.ageGroup,
+      evaluation: evalMap.get(s.id) || null,
+    }));
+
     return {
       success: true,
-      students: activeStudents.map(s => ({
-        ...s,
-        evaluation: evalMap.get(s.id) || null,
-      })),
+      students: studentsWithEval,
       evaluatedCount: monthEvals.length,
-      totalCount: activeStudents.length,
+      totalCount: studentsWithEval.length,
     };
   } catch (error) {
     console.error("Error fetching students with evaluations:", error);

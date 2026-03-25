@@ -218,9 +218,9 @@ export async function getStudentsReportOverview(filter?: { year: number; month: 
       const att = attByStudent.get(s.id);
       const attendanceRate = att && att.total > 0 ? Math.round((att.present / att.total) * 100) : 0;
 
-      // Combined score out of 100: coach(46) + parent(46) + attendance(8)
-      const scaledCoach = (avgCoach / 50) * 46;
-      const scaledParent = (avgParent / 50) * 46;
+      // Combined score out of 100: coach(42) + parent(50) + attendance(8)
+      const scaledCoach = (avgCoach / 50) * 42;
+      const scaledParent = avgParent;  // Parent already out of 50
       const attendancePoints = Math.min(att?.present ?? 0, 8);
       const avgCombined = Math.round((scaledCoach + scaledParent + attendancePoints) * 10) / 10;
 
@@ -255,9 +255,9 @@ export async function getStudentsReportOverview(filter?: { year: number; month: 
       ? Math.round(withAttendance.reduce((s, st) => s + st.attendanceRate, 0) / withAttendance.length)
       : 0;
 
-    // Global combined out of 100: coach(46) + parent(46) + attendance(8)
-    const globalScaledCoach = (globalAvgCoach / 50) * 46;
-    const globalScaledParent = (globalAvgParent / 50) * 46;
+    // Global combined out of 100: coach(42) + parent(50) + attendance(8)
+    const globalScaledCoach = (globalAvgCoach / 50) * 42;
+    const globalScaledParent = globalAvgParent;  // Parent already out of 50
     const globalAttendancePoints = withAttendance.length > 0
       ? Math.round(withAttendance.reduce((s, st) => s + Math.min(st.attendancePresent, 8), 0) / withAttendance.length * 10) / 10
       : 0;
@@ -445,9 +445,9 @@ export async function getStudentDetailReport(studentId: string) {
     for (const rec of monthMap.values()) {
       const att = attByMonth.get(`${rec.year}-${rec.month}`);
       const attRate = att && att.total > 0 ? Math.round((att.present / att.total) * 100) : 0;
-      // Combined out of 100: coach(46) + parent(46) + attendance(8)
-      const scaledCoach = ((rec.coach?.grandTotal || 0) / 50) * 46;
-      const scaledParent = ((rec.parent?.grandTotal || 0) / 50) * 46;
+      // Combined out of 100: coach(42) + parent(50) + attendance(8)
+      const scaledCoach = ((rec.coach?.grandTotal || 0) / 50) * 42;
+      const scaledParent = (rec.parent?.grandTotal || 0);  // Parent already out of 50
       const attendancePoints = Math.min(att?.present ?? 0, 8);
       rec.combined = Math.round((scaledCoach + scaledParent + attendancePoints) * 10) / 10;
       if (att && att.total > 0) {
@@ -474,9 +474,9 @@ export async function getStudentDetailReport(studentId: string) {
       ? Math.round(parentTotal.reduce((s, e) => s + (e.grandTotal || 0), 0) / parentTotal.length * 10) / 10
       : 0;
 
-    // Combined average out of 100: coach(46) + parent(46) + attendance(8)
-    const scaledCoachAvg = (coachAvg / 50) * 46;
-    const scaledParentAvg = (parentAvg / 50) * 46;
+    // Combined average out of 100: coach(42) + parent(50) + attendance(8)
+    const scaledCoachAvg = (coachAvg / 50) * 42;
+    const scaledParentAvg = parentAvg;  // Parent already out of 50
     const avgAttendancePoints = totalAtt > 0 ? Math.min(totalPresent, 8) : 0;
     const combinedAvg = Math.round((scaledCoachAvg + scaledParentAvg + avgAttendancePoints) * 10) / 10;
 

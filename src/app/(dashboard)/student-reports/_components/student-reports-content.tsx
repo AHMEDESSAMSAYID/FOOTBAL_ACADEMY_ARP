@@ -140,10 +140,10 @@ function OverviewView({
               <div>
                 <p className="text-xs text-zinc-500">معدل تقييم لاعب الشهر</p>
                 {(() => {
-                  const scaled = Math.round((totals.globalAvgCoach / 50) * 46 * 10) / 10;
+                  const scaled = Math.round((totals.globalAvgCoach / 50) * 42 * 10) / 10;
                   return (
-                    <p className={`text-xl font-bold ${scoreColor(scaled, 46)}`}>
-                      {scaled}<span className="text-sm text-zinc-400">/46</span>
+                    <p className={`text-xl font-bold ${scoreColor(scaled, 42)}`}>
+                      {scaled}<span className="text-sm text-zinc-400">/42</span>
                     </p>
                   );
                 })()}
@@ -160,10 +160,10 @@ function OverviewView({
               <div>
                 <p className="text-xs text-zinc-500">معدل تقييم الوالدين</p>
                 {(() => {
-                  const scaled = Math.round((totals.globalAvgParent / 50) * 46 * 10) / 10;
+                  const scaled = totals.globalAvgParent;  // Parent already out of 50
                   return (
-                    <p className={`text-xl font-bold ${scoreColor(scaled, 46)}`}>
-                      {scaled}<span className="text-sm text-zinc-400">/46</span>
+                    <p className={`text-xl font-bold ${scoreColor(scaled, 50)}`}>
+                      {scaled}<span className="text-sm text-zinc-400">/50</span>
                     </p>
                   );
                 })()}
@@ -233,12 +233,12 @@ function OverviewView({
                   </th>
                   <th className="px-4 py-3 text-center font-medium">
                     <button onClick={() => toggleSort("coach")} className="flex items-center justify-center gap-1">
-                      المدرب /46 <SortIcon col="coach" />
+                      المدرب /42 <SortIcon col="coach" />
                     </button>
                   </th>
                   <th className="px-4 py-3 text-center font-medium">
                     <button onClick={() => toggleSort("parent")} className="flex items-center justify-center gap-1">
-                      الوالدين /46 <SortIcon col="parent" />
+                      الوالدين /50 <SortIcon col="parent" />
                     </button>
                   </th>
                   <th className="px-4 py-3 text-center font-medium">
@@ -279,8 +279,8 @@ function OverviewView({
                       </td>
                       <td className="px-4 py-3 text-center">
                         {s.avgCoach > 0 ? (
-                          <span className={`font-semibold ${scoreColor(Math.round((s.avgCoach / 50) * 46 * 10) / 10, 46)}`}>
-                            {Math.round((s.avgCoach / 50) * 46 * 10) / 10}
+                          <span className={`font-semibold ${scoreColor(Math.round((s.avgCoach / 50) * 42 * 10) / 10, 42)}`}>
+                            {Math.round((s.avgCoach / 50) * 42 * 10) / 10}
                           </span>
                         ) : (
                           <span className="text-zinc-300">—</span>
@@ -288,8 +288,8 @@ function OverviewView({
                       </td>
                       <td className="px-4 py-3 text-center">
                         {s.avgParent > 0 ? (
-                          <span className={`font-semibold ${scoreColor(Math.round((s.avgParent / 50) * 46 * 10) / 10, 46)}`}>
-                            {Math.round((s.avgParent / 50) * 46 * 10) / 10}
+                          <span className={`font-semibold ${scoreColor(s.avgParent, 50)}`}>
+                            {s.avgParent}
                           </span>
                         ) : (
                           <span className="text-zinc-300">—</span>
@@ -414,16 +414,16 @@ function DetailView({
           <CardContent className="p-4 text-center">
             <p className="text-xs text-zinc-500">معدل المدرب</p>
             {(() => {
-              const scaled = Math.round((averages.coach / 50) * 46 * 10) / 10;
+              const scaled = Math.round((averages.coach / 50) * 42 * 10) / 10;
               return (
                 <>
-                  <p className={`text-2xl font-bold ${scoreColor(scaled, 46)}`}>
-                    {scaled}<span className="text-sm text-zinc-400">/46</span>
+                  <p className={`text-2xl font-bold ${scoreColor(scaled, 42)}`}>
+                    {scaled}<span className="text-sm text-zinc-400">/42</span>
                   </p>
                   <div className="mx-auto mt-2 h-2 w-full max-w-32 overflow-hidden rounded-full bg-zinc-100">
                     <div
-                      className={`h-full rounded-full ${scoreBg(scaled, 46)}`}
-                      style={{ width: `${(scaled / 46) * 100}%` }}
+                      className={`h-full rounded-full ${scoreBg(scaled, 42)}`}
+                      style={{ width: `${(scaled / 42) * 100}%` }}
                     />
                   </div>
                 </>
@@ -435,16 +435,16 @@ function DetailView({
           <CardContent className="p-4 text-center">
             <p className="text-xs text-zinc-500">معدل الوالدين</p>
             {(() => {
-              const scaled = Math.round((averages.parent / 50) * 46 * 10) / 10;
+              const scaled = averages.parent;  // Parent already out of 50
               return (
                 <>
-                  <p className={`text-2xl font-bold ${scoreColor(scaled, 46)}`}>
-                    {scaled}<span className="text-sm text-zinc-400">/46</span>
+                  <p className={`text-2xl font-bold ${scoreColor(scaled, 50)}`}>
+                    {scaled}<span className="text-sm text-zinc-400">/50</span>
                   </p>
                   <div className="mx-auto mt-2 h-2 w-full max-w-32 overflow-hidden rounded-full bg-zinc-100">
                     <div
-                      className={`h-full rounded-full ${scoreBg(scaled, 46)}`}
-                      style={{ width: `${(scaled / 46) * 100}%` }}
+                      className={`h-full rounded-full ${scoreBg(scaled, 50)}`}
+                      style={{ width: `${(scaled / 50) * 100}%` }}
                     />
                   </div>
                 </>
