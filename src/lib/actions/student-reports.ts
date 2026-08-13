@@ -75,14 +75,27 @@ export interface MonthlyRecord {
   } | null;
 }
 
+export type StudentStatus = "active" | "inactive" | "frozen" | "trial";
+
 export interface StudentReportSummary {
   id: string;
   name: string;
   ageGroup: string | null;
+  status: StudentStatus;
+  /** Number of months the player actually took part in (evaluation or attendance) */
   monthCount: number;
+  /** Number of months covered by the selected period (1 when a single month is picked) */
+  periodMonths: number;
+  /** monthCount / periodMonths, capped at 1 */
+  participationRate: number;
   avgCoach: number;
   avgParent: number;
+  /** Unweighted score /100 — the plain monthly average */
+  rawScore: number;
+  /** Final total /100 = rawScore × participationRate */
   avgCombined: number;
+  /** Average monthly attendance points /8 */
+  attendancePoints: number;
   lastCoach: number | null;
   lastParent: number | null;
   trend: "up" | "down" | "stable" | "none";
@@ -126,10 +139,16 @@ export async function getAvailableMonths() {
 // Get all students overview
 export async function getStudentsReportOverview(filter?: { year: number; month: number } | null) {
   try {
-    const activeStudents = await db
-      .select({ id: students.id, name: students.name, ageGroup: students.ageGroup })
+    // All players regardless of status — status is surfaced in the table so the
+    // coach can tell an inactive/frozen player apart from an active one.
+    const allStudents = await db
+      .select({
+        id: students.id,
+        name: students.name,
+        ageGroup: students.ageGroup,
+        status: students.status,
+      })
       .from(students)
-      .where(eq(students.status, "active"))
       .orderBy(students.name);
 
     const allCoachEvals = await db.select().from(evaluations);
@@ -163,11 +182,38 @@ export async function getStudentsReportOverview(filter?: { year: number; month: 
       : allAttendance;
 
     const attByStudent = new Map<string, { present: number; total: number }>();
+    // Attendance broken down per month so attendance points can be averaged per
+    // month instead of summed across the whole period (a running sum capped at 8
+    // handed every long-standing player a perfect 8/8 on the "الكل" view).
+    const attByStudentMonth = new Map<string, Map<string, { present: number; total: number }>>();
     for (const a of filteredAttendance) {
       if (!attByStudent.has(a.studentId)) attByStudent.set(a.studentId, { present: 0, total: 0 });
       const entry = attByStudent.get(a.studentId)!;
       entry.total++;
       if (a.status === "present") entry.present++;
+
+      const d = new Date(a.sessionDate);
+      const monthKey = `${d.getFullYear()}-${d.getMonth() + 1}`;
+      if (!attByStudentMonth.has(a.studentId)) attByStudentMonth.set(a.studentId, new Map());
+      const months = attByStudentMonth.get(a.studentId)!;
+      if (!months.has(monthKey)) months.set(monthKey, { present: 0, total: 0 });
+      const monthEntry = months.get(monthKey)!;
+      monthEntry.total++;
+      if (a.status === "present") monthEntry.present++;
+    }
+
+    // How many months the selected period spans. A single picked month is always
+    // 1; "الكل" spans every month the academy has any recorded data for.
+    let periodMonths = 1;
+    if (!filter) {
+      const periodMonthKeys = new Set<string>();
+      allCoachEvals.forEach((e) => periodMonthKeys.add(`${e.year}-${e.month}`));
+      allParentEvals.forEach((e) => periodMonthKeys.add(`${e.year}-${e.month}`));
+      allAttendance.forEach((a) => {
+        const d = new Date(a.sessionDate);
+        periodMonthKeys.add(`${d.getFullYear()}-${d.getMonth() + 1}`);
+      });
+      periodMonths = Math.max(periodMonthKeys.size, 1);
     }
 
     const coachByStudent = new Map<string, typeof allCoachEvals>();
@@ -182,14 +228,17 @@ export async function getStudentsReportOverview(filter?: { year: number; month: 
       parentByStudent.get(e.studentId)!.push(e);
     }
 
-    const summaries: StudentReportSummary[] = activeStudents.map((s) => {
+    const summaries: StudentReportSummary[] = allStudents.map((s) => {
       const coachEvals = coachByStudent.get(s.id) || [];
       const parentEvals = parentByStudent.get(s.id) || [];
 
-      // Collect all months with any data
+      // Collect all months with any data — evaluations *or* attendance, since a
+      // month the player trained in still counts as taking part in the season.
       const monthKeys = new Set<string>();
       coachEvals.forEach((e) => monthKeys.add(`${e.year}-${e.month}`));
       parentEvals.forEach((e) => monthKeys.add(`${e.year}-${e.month}`));
+      const attMonths = attByStudentMonth.get(s.id);
+      if (attMonths) attMonths.forEach((_v, key) => monthKeys.add(key));
 
       const avgCoach = coachEvals.length > 0
         ? Math.round(coachEvals.reduce((sum, e) => sum + e.grandTotal, 0) / coachEvals.length * 10) / 10
@@ -218,20 +267,38 @@ export async function getStudentsReportOverview(filter?: { year: number; month: 
       const att = attByStudent.get(s.id);
       const attendanceRate = att && att.total > 0 ? Math.round((att.present / att.total) * 100) : 0;
 
-      // Combined score out of 100: coach(42) + parent(50) + attendance(8)
+      // Attendance points /8 = average of min(present, 8) over the months the
+      // player actually has attendance records for.
+      const attendancePoints = attMonths && attMonths.size > 0
+        ? Math.round(
+            ([...attMonths.values()].reduce((sum, m) => sum + Math.min(m.present, 8), 0) / attMonths.size) * 10
+          ) / 10
+        : 0;
+
+      // Raw monthly score out of 100: coach(42) + parent(50) + attendance(8)
       const scaledCoach = (avgCoach / 50) * 42;
       const scaledParent = avgParent;  // Parent already out of 50
-      const attendancePoints = Math.min(att?.present ?? 0, 8);
-      const avgCombined = Math.round((scaledCoach + scaledParent + attendancePoints) * 10) / 10;
+      const rawScore = Math.round((scaledCoach + scaledParent + attendancePoints) * 10) / 10;
+
+      // Player-of-the-year weighting: a high average earned over a single month
+      // must not outrank a slightly lower average sustained across the season, so
+      // the raw score is scaled by how much of the period the player took part in.
+      const participationRate = Math.min(monthKeys.size / periodMonths, 1);
+      const avgCombined = Math.round(rawScore * participationRate * 10) / 10;
 
       return {
         id: s.id,
         name: s.name,
         ageGroup: s.ageGroup,
+        status: s.status as StudentStatus,
         monthCount: monthKeys.size,
+        periodMonths,
+        participationRate: Math.round(participationRate * 100) / 100,
         avgCoach,
         avgParent,
+        rawScore,
         avgCombined,
+        attendancePoints,
         lastCoach,
         lastParent,
         trend,
@@ -255,20 +322,20 @@ export async function getStudentsReportOverview(filter?: { year: number; month: 
       ? Math.round(withAttendance.reduce((s, st) => s + st.attendanceRate, 0) / withAttendance.length)
       : 0;
 
-    // Global combined out of 100: coach(42) + parent(50) + attendance(8)
-    const globalScaledCoach = (globalAvgCoach / 50) * 42;
-    const globalScaledParent = globalAvgParent;  // Parent already out of 50
-    const globalAttendancePoints = withAttendance.length > 0
-      ? Math.round(withAttendance.reduce((s, st) => s + Math.min(st.attendancePresent, 8), 0) / withAttendance.length * 10) / 10
+    // Global combined = average of the players' raw (unweighted) scores, so the
+    // benchmark reflects typical performance rather than season coverage.
+    const globalAvgCombined = withData.length > 0
+      ? Math.round(withData.reduce((s, st) => s + st.rawScore, 0) / withData.length * 10) / 10
       : 0;
-    const globalAvgCombined = Math.round((globalScaledCoach + globalScaledParent + globalAttendancePoints) * 10) / 10;
 
     return {
       success: true,
       students: summaries,
       totals: {
-        totalStudents: activeStudents.length,
+        totalStudents: summaries.length,
+        activeStudents: summaries.filter((s) => s.status === "active").length,
         evaluatedStudents: withData.length,
+        periodMonths,
         globalAvgCoach,
         globalAvgParent,
         globalAvgCombined,
@@ -285,7 +352,12 @@ export async function getStudentsReportOverview(filter?: { year: number; month: 
 export async function getStudentDetailReport(studentId: string) {
   try {
     const [student] = await db
-      .select({ id: students.id, name: students.name, ageGroup: students.ageGroup })
+      .select({
+        id: students.id,
+        name: students.name,
+        ageGroup: students.ageGroup,
+        status: students.status,
+      })
       .from(students)
       .where(eq(students.id, studentId));
 
@@ -427,7 +499,7 @@ export async function getStudentDetailReport(studentId: string) {
     }
 
     // Merge attendance into months & calculate combined
-    for (const [key, att] of attByMonth.entries()) {
+    for (const key of attByMonth.keys()) {
       if (!monthMap.has(key)) {
         const [y, m] = key.split("-").map(Number);
         monthMap.set(key, {
@@ -474,10 +546,16 @@ export async function getStudentDetailReport(studentId: string) {
       ? Math.round(parentTotal.reduce((s, e) => s + (e.grandTotal || 0), 0) / parentTotal.length * 10) / 10
       : 0;
 
-    // Combined average out of 100: coach(42) + parent(50) + attendance(8)
+    // Combined average out of 100: coach(42) + parent(50) + attendance(8).
+    // Attendance points are averaged per month — summing presences across every
+    // month would peg any long-standing player at a flat 8/8.
     const scaledCoachAvg = (coachAvg / 50) * 42;
     const scaledParentAvg = parentAvg;  // Parent already out of 50
-    const avgAttendancePoints = totalAtt > 0 ? Math.min(totalPresent, 8) : 0;
+    const avgAttendancePoints = attByMonth.size > 0
+      ? Math.round(
+          ([...attByMonth.values()].reduce((s, m) => s + Math.min(m.present, 8), 0) / attByMonth.size) * 10
+        ) / 10
+      : 0;
     const combinedAvg = Math.round((scaledCoachAvg + scaledParentAvg + avgAttendancePoints) * 10) / 10;
 
     return {
@@ -488,6 +566,7 @@ export async function getStudentDetailReport(studentId: string) {
         coach: coachAvg,
         parent: parentAvg,
         combined: combinedAvg,
+        attendancePoints: avgAttendancePoints,
       },
       attendanceSummary: {
         present: totalPresent,
