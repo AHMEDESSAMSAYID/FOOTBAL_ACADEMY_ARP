@@ -15,6 +15,7 @@ import {
   X,
   Loader2,
   RotateCcw,
+  CalendarCheck,
 } from "lucide-react";
 import {
   getStudentsWithEvaluations,
@@ -30,6 +31,14 @@ const MONTHS = [
   { value: 10, label: "أكتوبر" }, { value: 11, label: "نوفمبر" }, { value: 12, label: "ديسمبر" },
 ];
 
+interface AttendanceSummary {
+  present: number;
+  absent: number;
+  excused: number;
+  total: number;
+  rate: number;
+}
+
 interface StudentWithEval {
   id: string;
   name: string;
@@ -43,6 +52,15 @@ interface StudentWithEval {
     technicalProgress: number | null;
     notes: string | null;
   } | null;
+  attendance: AttendanceSummary;
+}
+
+// Attendance rate colouring — same thresholds used across the reports pages
+function attendanceColor(rate: number): string {
+  if (rate >= 80) return "text-green-600";
+  if (rate >= 60) return "text-yellow-600";
+  if (rate >= 40) return "text-orange-500";
+  return "text-red-500";
 }
 
 // New 4-criteria evaluation system (/50 total)
@@ -260,6 +278,57 @@ export function EvaluationsContent() {
           )}
         </div>
 
+        {/* Attendance summary — context for the coach before scoring */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-emerald-600"><CalendarCheck className="h-4 w-4" /></span>
+                نسبة الحضور خلال الشهر
+              </div>
+              <span className={`text-base font-bold ${attendanceColor(selectedStudent.attendance.rate)}`}>
+                {selectedStudent.attendance.rate}%
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {selectedStudent.attendance.total > 0 ? (
+              <>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="rounded-lg bg-green-50 p-2">
+                    <p className="text-lg font-bold text-green-600">{selectedStudent.attendance.present}</p>
+                    <p className="text-[11px] text-green-700">حاضر</p>
+                  </div>
+                  <div className="rounded-lg bg-red-50 p-2">
+                    <p className="text-lg font-bold text-red-500">{selectedStudent.attendance.absent}</p>
+                    <p className="text-[11px] text-red-700">غائب</p>
+                  </div>
+                  <div className="rounded-lg bg-amber-50 p-2">
+                    <p className="text-lg font-bold text-amber-500">{selectedStudent.attendance.excused}</p>
+                    <p className="text-[11px] text-amber-700">مستأذن</p>
+                  </div>
+                </div>
+                <div className="mt-3 flex h-2.5 overflow-hidden rounded-full bg-zinc-100">
+                  {selectedStudent.attendance.present > 0 && (
+                    <div className="bg-green-500" style={{ width: `${(selectedStudent.attendance.present / selectedStudent.attendance.total) * 100}%` }} />
+                  )}
+                  {selectedStudent.attendance.excused > 0 && (
+                    <div className="bg-amber-400" style={{ width: `${(selectedStudent.attendance.excused / selectedStudent.attendance.total) * 100}%` }} />
+                  )}
+                  {selectedStudent.attendance.absent > 0 && (
+                    <div className="bg-red-400" style={{ width: `${(selectedStudent.attendance.absent / selectedStudent.attendance.total) * 100}%` }} />
+                  )}
+                </div>
+                <p className="mt-2 text-center text-xs text-zinc-500">
+                  حضر {selectedStudent.attendance.present} من {selectedStudent.attendance.total} حصة هذا الشهر
+                </p>
+              </>
+            ) : (
+              <p className="text-center text-xs text-zinc-400">لا توجد حصص مسجلة لهذا الشهر</p>
+            )}
+          </CardContent>
+        </Card>
+
         {/* KPI Categories */}
         {categories.map(cat => {
           const catTotal = cat.items.reduce((sum, item) => sum + scores[item.key as ScoreKeys], 0);
@@ -433,7 +502,16 @@ export function EvaluationsContent() {
                 <div className={`w-2 h-2 rounded-full shrink-0 ${s.evaluation ? "bg-emerald-500" : "bg-zinc-300"}`} />
                 <div className="min-w-0">
                   <p className="font-medium text-sm truncate">{s.name}</p>
-                  {s.ageGroup && <p className="text-xs text-zinc-400">{s.ageGroup}</p>}
+                  <div className="flex items-center gap-2">
+                    {s.ageGroup && <p className="text-xs text-zinc-400">{s.ageGroup}</p>}
+                    {s.attendance.total > 0 && (
+                      <p className="text-xs text-zinc-400 flex items-center gap-1">
+                        <CalendarCheck className="h-3 w-3" />
+                        <span className={attendanceColor(s.attendance.rate)}>{s.attendance.rate}%</span>
+                        <span className="text-zinc-300">({s.attendance.present}/{s.attendance.total})</span>
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">

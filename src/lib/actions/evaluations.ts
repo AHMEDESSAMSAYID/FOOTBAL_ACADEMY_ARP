@@ -169,13 +169,50 @@ export async function getStudentsWithEvaluations(month: number, year: number) {
 
     const evalMap = new Map(monthEvals.map(e => [e.studentId, e]));
 
-    // Map students with their evaluations
-    const studentsWithEval = studentList.map(s => ({
-      id: s.id,
-      name: s.name,
-      ageGroup: s.ageGroup,
-      evaluation: evalMap.get(s.id) || null,
-    }));
+    // Attendance for the same month, so the coach can weigh commitment while
+    // scoring the player.
+    const monthAttendance = await db
+      .select({
+        studentId: attendance.studentId,
+        status: attendance.status,
+      })
+      .from(attendance)
+      .innerJoin(trainingSessions, eq(attendance.sessionId, trainingSessions.id))
+      .where(
+        and(
+          sql`${trainingSessions.sessionDate} >= ${startDate}`,
+          sql`${trainingSessions.sessionDate} <= ${endDate}`
+        )
+      );
+
+    const attMap = new Map<string, { present: number; absent: number; excused: number; total: number }>();
+    for (const a of monthAttendance) {
+      if (!attMap.has(a.studentId)) {
+        attMap.set(a.studentId, { present: 0, absent: 0, excused: 0, total: 0 });
+      }
+      const entry = attMap.get(a.studentId)!;
+      entry.total++;
+      if (a.status === "present") entry.present++;
+      else if (a.status === "absent") entry.absent++;
+      else if (a.status === "excused") entry.excused++;
+    }
+
+    // Map students with their evaluations + attendance
+    const studentsWithEval = studentList.map(s => {
+      const att = attMap.get(s.id);
+      return {
+        id: s.id,
+        name: s.name,
+        ageGroup: s.ageGroup,
+        evaluation: evalMap.get(s.id) || null,
+        attendance: att
+          ? {
+              ...att,
+              rate: att.total > 0 ? Math.round((att.present / att.total) * 100) : 0,
+            }
+          : { present: 0, absent: 0, excused: 0, total: 0, rate: 0 },
+      };
+    });
 
     return {
       success: true,

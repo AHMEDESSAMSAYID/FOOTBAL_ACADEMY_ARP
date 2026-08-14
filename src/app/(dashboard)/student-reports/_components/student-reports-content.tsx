@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +18,7 @@ import {
   getAvailableMonths,
   type StudentReportSummary,
   type MonthlyRecord,
+  type StudentStatus,
 } from "@/lib/actions/student-reports";
 import { sendReportSms } from "@/lib/actions/notifications";
 import { toast } from "sonner";
@@ -37,7 +38,24 @@ import {
   FileDown,
   MessageSquare,
   Calendar,
+  Trophy,
+  Info,
 } from "lucide-react";
+
+// ===== Student status =====
+const STATUS_CONFIG: Record<StudentStatus, { label: string; className: string }> = {
+  active: { label: "نشط", className: "bg-green-100 text-green-700" },
+  inactive: { label: "متوقف", className: "bg-zinc-100 text-zinc-700" },
+  frozen: { label: "مجمد", className: "bg-blue-100 text-blue-700" },
+  trial: { label: "تجريبي", className: "bg-amber-100 text-amber-700" },
+};
+
+const STATUS_ORDER: StudentStatus[] = ["active", "trial", "frozen", "inactive"];
+
+function StatusBadge({ status }: { status: StudentStatus }) {
+  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.inactive;
+  return <Badge className={`${cfg.className} text-[11px] font-medium`}>{cfg.label}</Badge>;
+}
 
 // ===== PDF Export =====
 function handlePrintReport() {
@@ -73,25 +91,36 @@ function scoreBadgeBg(score: number, max: number): string {
 function OverviewView({
   students: studentsList,
   totals,
+  isAllMonths,
   onSelect,
 }: {
   students: StudentReportSummary[];
   totals: {
     totalStudents: number;
+    activeStudents: number;
     evaluatedStudents: number;
+    periodMonths: number;
     globalAvgCoach: number;
     globalAvgParent: number;
     globalAvgCombined: number;
     globalAttendanceRate: number;
   };
+  isAllMonths: boolean;
   onSelect: (id: string) => void;
 }) {
   const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState<"name" | "coach" | "parent" | "combined" | "attendance">("combined");
+  const [statusFilter, setStatusFilter] = useState<"all" | StudentStatus>("all");
+  const [sortBy, setSortBy] = useState<"name" | "coach" | "parent" | "combined" | "attendance" | "months" | "status">("combined");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  const statusCounts = studentsList.reduce((acc, s) => {
+    acc[s.status] = (acc[s.status] ?? 0) + 1;
+    return acc;
+  }, {} as Record<StudentStatus, number>);
 
   const filtered = studentsList
     .filter((s) => s.name.includes(search))
+    .filter((s) => statusFilter === "all" || s.status === statusFilter)
     .sort((a, b) => {
       let diff = 0;
       switch (sortBy) {
@@ -100,16 +129,26 @@ function OverviewView({
         case "parent": diff = a.avgParent - b.avgParent; break;
         case "combined": diff = a.avgCombined - b.avgCombined; break;
         case "attendance": diff = a.attendanceRate - b.attendanceRate; break;
+        case "months": diff = a.monthCount - b.monthCount; break;
+        case "status":
+          diff = STATUS_ORDER.indexOf(b.status) - STATUS_ORDER.indexOf(a.status);
+          break;
       }
       return sortDir === "desc" ? -diff : diff;
     });
+
+  // Podium markers only make sense on the season-wide ranking, sorted by total.
+  const showRanking = isAllMonths && sortBy === "combined" && sortDir === "desc";
+  const rankStyles = ["text-amber-500", "text-zinc-400", "text-orange-400"];
 
   const toggleSort = (col: typeof sortBy) => {
     if (sortBy === col) setSortDir((d) => (d === "desc" ? "asc" : "desc"));
     else { setSortBy(col); setSortDir("desc"); }
   };
 
-  const SortIcon = ({ col }: { col: typeof sortBy }) => {
+  // Plain render helper rather than a nested component, so React does not
+  // remount it on every render of the table.
+  const sortIcon = (col: typeof sortBy) => {
     if (sortBy !== col) return null;
     return sortDir === "desc" ? <ChevronDown className="inline h-3.5 w-3.5" /> : <ChevronUp className="inline h-3.5 w-3.5" />;
   };
@@ -125,8 +164,12 @@ function OverviewView({
                 <Users className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-xs text-zinc-500">اللاعبين النشطين</p>
-                <p className="text-xl font-bold">{totals.totalStudents}</p>
+                <p className="text-xs text-zinc-500">اللاعبين</p>
+                <p className="text-xl font-bold">
+                  {totals.totalStudents}
+                  <span className="text-xs font-normal text-zinc-400"> إجمالي</span>
+                </p>
+                <p className="text-[11px] text-green-600">{totals.activeStudents} نشط</p>
               </div>
             </div>
           </CardContent>
@@ -203,15 +246,55 @@ function OverviewView({
         </Card>
       </div>
 
-      {/* Search */}
-      <div className="relative print:hidden">
-        <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-        <Input
-          placeholder="بحث عن لاعب..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pr-10"
-        />
+      {/* Search + status filter */}
+      <div className="flex flex-col gap-3 sm:flex-row print:hidden">
+        <div className="relative flex-1">
+          <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+          <Input
+            placeholder="بحث عن لاعب..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pr-10"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | StudentStatus)}>
+          <SelectTrigger className="w-full sm:w-[200px]">
+            <SelectValue placeholder="الحالة" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">كل الحالات ({studentsList.length})</SelectItem>
+            {STATUS_ORDER.map((st) => (
+              <SelectItem key={st} value={st}>
+                {STATUS_CONFIG[st].label} ({statusCounts[st] ?? 0})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Total formula explainer */}
+      <div className="flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50/60 p-3 text-xs text-blue-900">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+        <div className="space-y-1">
+          <p className="font-medium">طريقة حساب الإجمالي</p>
+          <p>
+            المعدل الشهري /100 = المدرب (42) + الوالدين (50) + الحضور (8)
+            {isAllMonths ? (
+              <>
+                {" "}— ثم يُضرب في نسبة المشاركة (عدد أشهر اللاعب ÷ {totals.periodMonths} شهر في الموسم).
+              </>
+            ) : (
+              <>{" "}— لهذا الشهر فقط.</>
+            )}
+          </p>
+          {isAllMonths && (
+            <p className="text-blue-700">
+              لاعب حقق 99 في شهر واحد من {totals.periodMonths} أشهر ينزل إلى{" "}
+              {Math.round((99 / Math.max(totals.periodMonths, 1)) * 10) / 10}، بينما لاعب حقق 89 على مدار الموسم
+              كاملاً يبقى 89 — لاعب العام لمن واظب طوال الموسم بأعلى تقييم.
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Table */}
@@ -223,27 +306,37 @@ function OverviewView({
                 <tr className="border-b bg-zinc-50 text-zinc-600">
                   <th className="px-4 py-3 text-right font-medium">
                     <button onClick={() => toggleSort("name")} className="flex items-center gap-1">
-                      اللاعب <SortIcon col="name" />
+                      اللاعب {sortIcon("name")}
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 text-center font-medium">
+                    <button onClick={() => toggleSort("status")} className="flex items-center justify-center gap-1">
+                      الحالة {sortIcon("status")}
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 text-center font-medium">
+                    <button onClick={() => toggleSort("months")} className="flex items-center justify-center gap-1">
+                      الأشهر {sortIcon("months")}
                     </button>
                   </th>
                   <th className="px-4 py-3 text-center font-medium">
                     <button onClick={() => toggleSort("attendance")} className="flex items-center justify-center gap-1">
-                      الحضور <SortIcon col="attendance" />
+                      الحضور {sortIcon("attendance")}
                     </button>
                   </th>
                   <th className="px-4 py-3 text-center font-medium">
                     <button onClick={() => toggleSort("coach")} className="flex items-center justify-center gap-1">
-                      المدرب /42 <SortIcon col="coach" />
+                      المدرب /42 {sortIcon("coach")}
                     </button>
                   </th>
                   <th className="px-4 py-3 text-center font-medium">
                     <button onClick={() => toggleSort("parent")} className="flex items-center justify-center gap-1">
-                      الوالدين /50 <SortIcon col="parent" />
+                      الوالدين /50 {sortIcon("parent")}
                     </button>
                   </th>
                   <th className="px-4 py-3 text-center font-medium">
                     <button onClick={() => toggleSort("combined")} className="flex items-center justify-center gap-1">
-                      الإجمالي /100 <SortIcon col="combined" />
+                      الإجمالي /100 {sortIcon("combined")}
                     </button>
                   </th>
                   <th className="px-4 py-3 text-center font-medium">الاتجاه</th>
@@ -253,20 +346,51 @@ function OverviewView({
               <tbody className="divide-y">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-zinc-400">
+                    <td colSpan={9} className="px-4 py-8 text-center text-zinc-400">
                       لا توجد بيانات
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((s) => (
-                    <tr key={s.id} className="cursor-pointer transition-colors hover:bg-zinc-50" onClick={() => onSelect(s.id)}>
+                  filtered.map((s, idx) => (
+                    <tr
+                      key={s.id}
+                      className={`cursor-pointer transition-colors hover:bg-zinc-50 ${s.status !== "active" ? "bg-zinc-50/40" : ""}`}
+                      onClick={() => onSelect(s.id)}
+                    >
                       <td className="px-4 py-3">
-                        <div>
-                          <p className="font-medium text-zinc-900">{s.name}</p>
-                          {s.ageGroup && (
-                            <p className="text-xs text-zinc-400">{s.ageGroup}</p>
+                        <div className="flex items-center gap-2">
+                          {showRanking && idx < 3 && (
+                            <Trophy className={`h-4 w-4 shrink-0 ${rankStyles[idx]}`} />
                           )}
+                          <div>
+                            <p className={`font-medium ${s.status === "active" ? "text-zinc-900" : "text-zinc-500"}`}>
+                              {s.name}
+                            </p>
+                            {s.ageGroup && (
+                              <p className="text-xs text-zinc-400">{s.ageGroup}</p>
+                            )}
+                          </div>
                         </div>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <StatusBadge status={s.status} />
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {s.monthCount > 0 ? (
+                          <div>
+                            <span className={`font-semibold ${scoreColor(s.participationRate * 100, 100)}`}>
+                              {s.monthCount}
+                            </span>
+                            <span className="text-xs text-zinc-400">/{s.periodMonths}</span>
+                            {isAllMonths && (
+                              <p className="text-[10px] text-zinc-400">
+                                {Math.round(s.participationRate * 100)}% مشاركة
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-zinc-300">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-center">
                         {s.attendanceTotal > 0 ? (
@@ -296,10 +420,17 @@ function OverviewView({
                         )}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        {s.avgCombined > 0 ? (
-                          <Badge className={scoreBadgeBg(s.avgCombined, 100)}>
-                            {s.avgCombined}
-                          </Badge>
+                        {s.rawScore > 0 ? (
+                          <div className="space-y-0.5">
+                            <Badge className={scoreBadgeBg(s.avgCombined, 100)}>
+                              {s.avgCombined}
+                            </Badge>
+                            {isAllMonths && s.participationRate < 1 && (
+                              <p className="text-[10px] text-zinc-400">
+                                المعدل {s.rawScore} × {Math.round(s.participationRate * 100)}%
+                              </p>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-zinc-300">—</span>
                         )}
@@ -335,9 +466,9 @@ function DetailView({
   attendanceSummary,
   onBack,
 }: {
-  student: { id: string; name: string; ageGroup: string | null };
+  student: { id: string; name: string; ageGroup: string | null; status: StudentStatus };
   records: MonthlyRecord[];
-  averages: { coach: number; parent: number; combined: number };
+  averages: { coach: number; parent: number; combined: number; attendancePoints: number };
   attendanceSummary: { present: number; absent: number; excused: number; total: number; rate: number };
   onBack: () => void;
 }) {
@@ -371,7 +502,10 @@ function DetailView({
             رجوع
           </Button>
           <div>
-            <h2 className="text-xl font-bold text-zinc-900">{student.name}</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-bold text-zinc-900">{student.name}</h2>
+              <StatusBadge status={student.status} />
+            </div>
             {student.ageGroup && (
               <p className="text-sm text-zinc-500">الفئة العمرية: {student.ageGroup}</p>
             )}
@@ -456,14 +590,15 @@ function DetailView({
           <CardContent className="p-4 text-center">
             <p className="text-xs text-zinc-500">الحضور</p>
             {(() => {
-              const attPoints = Math.min(attendanceSummary.present, 8);
+              // Average monthly attendance points, not a running total
+              const attPoints = averages.attendancePoints;
               return (
                 <>
                   <p className={`text-2xl font-bold ${scoreColor(attPoints, 8)}`}>
                     {attPoints}<span className="text-sm text-zinc-400">/8</span>
                   </p>
                   <p className="mt-1 text-[10px] text-zinc-400">
-                    {attendanceSummary.present} حضور من {attendanceSummary.total} حصة
+                    {attendanceSummary.present} حضور من {attendanceSummary.total} حصة ({attendanceSummary.rate}%)
                   </p>
                   <div className="mx-auto mt-1 h-2 w-full max-w-32 overflow-hidden rounded-full bg-zinc-100">
                     <div
@@ -836,7 +971,9 @@ export function StudentReportsContent() {
   const [students, setStudents] = useState<StudentReportSummary[]>([]);
   const [totals, setTotals] = useState({
     totalStudents: 0,
+    activeStudents: 0,
     evaluatedStudents: 0,
+    periodMonths: 1,
     globalAvgCoach: 0,
     globalAvgParent: 0,
     globalAvgCombined: 0,
@@ -847,9 +984,10 @@ export function StudentReportsContent() {
     id: string;
     name: string;
     ageGroup: string | null;
+    status: StudentStatus;
   } | null>(null);
   const [detailRecords, setDetailRecords] = useState<MonthlyRecord[]>([]);
-  const [detailAverages, setDetailAverages] = useState({ coach: 0, parent: 0, combined: 0 });
+  const [detailAverages, setDetailAverages] = useState({ coach: 0, parent: 0, combined: 0, attendancePoints: 0 });
   const [detailAttendance, setDetailAttendance] = useState({ present: 0, absent: 0, excused: 0, total: 0, rate: 0 });
 
   // Load available months on mount
@@ -888,7 +1026,7 @@ export function StudentReportsContent() {
     setLoading(true);
     const result = await getStudentDetailReport(id);
     if (result.success && result.student) {
-      setSelectedStudent(result.student);
+      setSelectedStudent({ ...result.student, status: result.student.status as StudentStatus });
       setDetailRecords(result.records!);
       setDetailAverages(result.averages!);
       setDetailAttendance(result.attendanceSummary!);
@@ -939,6 +1077,7 @@ export function StudentReportsContent() {
         <OverviewView
           students={students}
           totals={totals}
+          isAllMonths={selectedMonth === "all"}
           onSelect={handleSelectStudent}
         />
       ) : selectedStudent ? (
