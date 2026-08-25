@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/db";
+import { PAYMENT_TYPE_LABELS } from "@/lib/payment-types";
 import { students, contacts, payments, feeConfigs, paymentCoverage, leads } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 
@@ -85,11 +86,7 @@ export async function exportPaymentsData(startDate?: string, endDate?: string) {
       bank_transfer: "تحويل بنكي",
     };
 
-    const typeMap: Record<string, string> = {
-      monthly: "اشتراك شهري",
-      bus: "رسوم الباص",
-      uniform: "الزي الرسمي",
-    };
+    const typeMap: Record<string, string> = PAYMENT_TYPE_LABELS;
 
     let filteredPayments = allPayments;
     if (startDate) {

@@ -1,13 +1,14 @@
 "use client";
 
 import { jsPDF } from "jspdf";
+import type { PaymentType } from "@/lib/payment-types";
 
 interface ReceiptData {
   paymentId: string;
   studentName: string;
   membershipNumber?: string;
   amount: string;
-  paymentType: "monthly" | "bus" | "uniform";
+  paymentType: PaymentType;
   paymentMethod: "cash" | "bank_transfer";
   payerName?: string | null;
   paymentDate: string;
@@ -19,6 +20,7 @@ const paymentTypeAr: Record<string, string> = {
   monthly: "\u0627\u0634\u062a\u0631\u0627\u0643 \u0634\u0647\u0631\u064a",
   bus: "\u0631\u0633\u0648\u0645 \u0627\u0644\u0628\u0627\u0635",
   uniform: "\u0627\u0644\u0632\u064a \u0627\u0644\u0631\u0633\u0645\u064a",
+  activity: "\u0631\u0633\u0648\u0645 \u0627\u0644\u0623\u0646\u0634\u0637\u0629",
 };
 
 const paymentMethodAr: Record<string, string> = {

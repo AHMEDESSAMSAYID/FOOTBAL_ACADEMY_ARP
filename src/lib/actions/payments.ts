@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { feeConfigs, payments, paymentCoverage } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { type PaymentType, coverageFeeType } from "@/lib/payment-types";
 
 // Story 3-2: Configure Custom Pricing Per Student
 interface FeeConfigInput {
@@ -70,7 +71,7 @@ export async function upsertFeeConfig(input: FeeConfigInput) {
 interface PaymentInput {
   studentId: string;
   amount: number;
-  paymentType: "monthly" | "bus" | "uniform";
+  paymentType: PaymentType;
   paymentMethod: "cash" | "bank_transfer";
   payerName?: string;
   notes?: string;
@@ -117,10 +118,13 @@ export async function recordPayment(input: PaymentInput) {
       .returning();
 
     // Create payment coverage records for each month the range spans
-    if (input.coverageStart && input.coverageEnd && input.paymentType !== "uniform") {
+    // Only recurring fees (monthly, bus) are tracked month by month. One-off
+    // fees such as the uniform or an activity create no coverage rows.
+    const recordFeeType = coverageFeeType(input.paymentType);
+    if (input.coverageStart && input.coverageEnd && recordFeeType) {
       const months = getMonthsInRange(input.coverageStart, input.coverageEnd);
       const amountPerMonth = input.amount / months.length;
-      const feeType = input.paymentType === "monthly" ? "monthly" : "bus";
+      const feeType = recordFeeType;
 
       for (const yearMonth of months) {
         // Check if coverage record exists
@@ -232,7 +236,7 @@ interface UpdatePaymentInput {
   paymentId: string;
   studentId: string;
   amount: number;
-  paymentType: "monthly" | "bus" | "uniform";
+  paymentType: PaymentType;
   paymentMethod: "cash" | "bank_transfer";
   payerName?: string;
   notes?: string;
@@ -269,9 +273,10 @@ export async function updatePayment(input: UpdatePaymentInput) {
       .where(eq(payments.id, input.paymentId));
 
     // 3) Re-create coverage records
-    if (months.length > 0 && input.paymentType !== "uniform") {
+    const updateFeeType = coverageFeeType(input.paymentType);
+    if (months.length > 0 && updateFeeType) {
       const amountPerMonth = input.amount / months.length;
-      const feeType = input.paymentType === "monthly" ? "monthly" : "bus";
+      const feeType = updateFeeType;
 
       const feeConfig = await db.query.feeConfigs.findFirst({
         where: eq(feeConfigs.studentId, input.studentId),
@@ -352,7 +357,7 @@ interface UpdatePaymentQuickInput {
   paymentId: string;
   studentId: string;
   amount: number;
-  paymentType: "monthly" | "bus" | "uniform";
+  paymentType: PaymentType;
   paymentMethod: "cash" | "bank_transfer";
   payerName?: string;
   notes?: string;

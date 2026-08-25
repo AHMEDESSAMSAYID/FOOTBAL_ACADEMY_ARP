@@ -14,6 +14,11 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { updatePaymentQuick } from "@/lib/actions/payments";
+import {
+  PAYMENT_TYPES,
+  PAYMENT_TYPE_SHORT_LABELS,
+  type PaymentType,
+} from "@/lib/payment-types";
 import { toast } from "sonner";
 import {
   Pencil,
@@ -30,7 +35,7 @@ interface Payment {
   id: string;
   studentId: string;
   amount: string;
-  paymentType: "monthly" | "bus" | "uniform";
+  paymentType: PaymentType;
   paymentMethod: "cash" | "bank_transfer";
   payerName: string | null;
   notes: string | null;
@@ -50,10 +55,13 @@ interface AllPaymentsTabProps {
   payments: { payment: Payment; student: Student }[];
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  monthly: "شهري",
-  bus: "باص",
-  uniform: "زي",
+const TYPE_LABELS = PAYMENT_TYPE_SHORT_LABELS;
+
+const TYPE_BADGE_STYLES: Record<PaymentType, string> = {
+  monthly: "border-blue-300 text-blue-600",
+  bus: "border-amber-300 text-amber-600",
+  uniform: "border-purple-300 text-purple-600",
+  activity: "border-emerald-300 text-emerald-600",
 };
 
 const METHOD_LABELS: Record<string, string> = {
@@ -71,7 +79,7 @@ export default function AllPaymentsTab({ payments }: AllPaymentsTabProps) {
   // Edit form state
   const [editForm, setEditForm] = useState({
     amount: "",
-    paymentType: "" as "monthly" | "bus" | "uniform",
+    paymentType: "" as PaymentType | "",
     paymentMethod: "" as "cash" | "bank_transfer",
     payerName: "",
     notes: "",
@@ -118,12 +126,17 @@ export default function AllPaymentsTab({ payments }: AllPaymentsTabProps) {
   }
 
   function saveEdit(paymentId: string, studentId: string) {
+    const { paymentType } = editForm;
+    if (!paymentType) {
+      toast.error("يرجى اختيار نوع الدفعة");
+      return;
+    }
     startTransition(async () => {
       const result = await updatePaymentQuick({
         paymentId,
         studentId,
         amount: parseFloat(editForm.amount),
-        paymentType: editForm.paymentType,
+        paymentType,
         paymentMethod: editForm.paymentMethod,
         payerName: editForm.payerName || undefined,
         notes: editForm.notes || undefined,
@@ -158,9 +171,9 @@ export default function AllPaymentsTab({ payments }: AllPaymentsTabProps) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">الكل</SelectItem>
-            <SelectItem value="monthly">شهري</SelectItem>
-            <SelectItem value="bus">باص</SelectItem>
-            <SelectItem value="uniform">زي</SelectItem>
+            {PAYMENT_TYPES.map((t) => (
+              <SelectItem key={t} value={t}>{PAYMENT_TYPE_SHORT_LABELS[t]}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -203,13 +216,7 @@ export default function AllPaymentsTab({ payments }: AllPaymentsTabProps) {
                         </Link>
                         <Badge
                           variant="outline"
-                          className={
-                            payment.paymentType === "monthly"
-                              ? "border-blue-300 text-blue-600"
-                              : payment.paymentType === "bus"
-                              ? "border-amber-300 text-amber-600"
-                              : "border-purple-300 text-purple-600"
-                          }
+                          className={TYPE_BADGE_STYLES[payment.paymentType]}
                         >
                           {TYPE_LABELS[payment.paymentType]}
                         </Badge>
@@ -326,7 +333,7 @@ export default function AllPaymentsTab({ payments }: AllPaymentsTabProps) {
                             onValueChange={(v) =>
                               setEditForm({
                                 ...editForm,
-                                paymentType: v as "monthly" | "bus" | "uniform",
+                                paymentType: v as PaymentType,
                               })
                             }
                           >
@@ -334,9 +341,9 @@ export default function AllPaymentsTab({ payments }: AllPaymentsTabProps) {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="monthly">شهري</SelectItem>
-                              <SelectItem value="bus">باص</SelectItem>
-                              <SelectItem value="uniform">زي</SelectItem>
+                              {PAYMENT_TYPES.map((t) => (
+                                <SelectItem key={t} value={t}>{PAYMENT_TYPE_SHORT_LABELS[t]}</SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>

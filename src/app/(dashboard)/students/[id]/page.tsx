@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { db } from "@/db";
+import { paymentTypeLabel } from "@/lib/payment-types";
+import type { PaymentType } from "@/lib/payment-types";
 import { students, contacts, payments, feeConfigs, uniformRecords } from "@/db/schema";
 import { eq, desc, and, ne } from "drizzle-orm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -354,9 +356,7 @@ export default async function StudentPage({ params }: StudentPageProps) {
                       <div>
                         <p className="font-medium">{payment.amount} TL</p>
                         <p className="text-sm text-zinc-500">
-                          {payment.paymentType === "monthly" && "اشتراك شهري"}
-                          {payment.paymentType === "bus" && "رسوم الباص"}
-                          {payment.paymentType === "uniform" && "الزي الرسمي"}
+                          {paymentTypeLabel(payment.paymentType)}
                           {payment.payerName && ` • ${payment.payerName}`}
                         </p>
                         {payment.notes && (
@@ -376,7 +376,7 @@ export default async function StudentPage({ params }: StudentPageProps) {
                           studentName={student.name}
                           membershipNumber={student.membershipNumber || undefined}
                           amount={payment.amount}
-                          paymentType={payment.paymentType as "monthly" | "bus" | "uniform"}
+                          paymentType={payment.paymentType as PaymentType}
                           paymentMethod={payment.paymentMethod as "cash" | "bank_transfer"}
                           payerName={payment.payerName}
                           paymentDate={payment.paymentDate}

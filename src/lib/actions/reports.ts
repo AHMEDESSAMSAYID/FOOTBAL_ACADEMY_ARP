@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/db";
+import { PAYMENT_TYPE_LABELS } from "@/lib/payment-types";
 import { students, payments, paymentCoverage, feeConfigs, attendance, trainingSessions, leads } from "@/db/schema";
 import { eq, and, desc, gte, lte, sql, count } from "drizzle-orm";
 import { getBillingInfo } from "@/lib/billing";
@@ -123,7 +124,7 @@ export async function getReportsData(): Promise<{ success: boolean; data?: Repor
 
     // === PAYMENT BREAKDOWN ===
     const methodMap: Record<string, string> = { cash: "نقدي", bank_transfer: "تحويل بنكي" };
-    const typeMap: Record<string, string> = { monthly: "اشتراك شهري", bus: "رسوم باص", uniform: "زي رسمي" };
+    const typeMap: Record<string, string> = PAYMENT_TYPE_LABELS;
 
     const byMethod: Record<string, { count: number; total: number }> = {};
     const byType: Record<string, { count: number; total: number }> = {};

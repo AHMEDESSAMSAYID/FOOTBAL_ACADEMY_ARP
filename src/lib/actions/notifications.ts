@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/db";
+import { paymentTypeLabel } from "@/lib/payment-types";
 import { 
   notifications, 
   escalationLogs, 
@@ -343,12 +344,7 @@ export async function sendPaymentSms(
   paymentType: string
 ) {
   try {
-    const typeText =
-      paymentType === "monthly"
-        ? "اشتراك شهري"
-        : paymentType === "bus"
-          ? "رسوم نقل"
-          : "زي رياضي";
+    const typeText = paymentTypeLabel(paymentType);
 
     const message = `أكاديمية Española\n\nتم تسجيل دفعة للطالب/ة ${studentName}\nالمبلغ: ${amount} ₺\nالنوع: ${typeText}\n\nشكراً لكم`;
 
