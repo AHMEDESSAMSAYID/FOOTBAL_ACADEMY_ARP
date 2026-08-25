@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { db } from "@/db";
+import type { PaymentType } from "@/lib/payment-types";
 import { students, feeConfigs, payments } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,7 +63,7 @@ export default async function EditPaymentPage({ params }: EditPaymentPageProps) 
             } : undefined}
             initialData={{
               amount: payment.amount,
-              paymentType: payment.paymentType as "monthly" | "bus" | "uniform",
+              paymentType: payment.paymentType as PaymentType,
               paymentMethod: payment.paymentMethod as "cash" | "bank_transfer",
               payerName: payment.payerName,
               notes: payment.notes,

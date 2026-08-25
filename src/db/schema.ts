@@ -52,7 +52,8 @@ export const discountTypeEnum = pgEnum('discount_type', [
 export const paymentTypeEnum = pgEnum('payment_type', [
   'monthly',
   'bus',
-  'uniform'
+  'uniform',
+  'activity'
 ]);
 
 export const paymentMethodEnum = pgEnum('payment_method', [

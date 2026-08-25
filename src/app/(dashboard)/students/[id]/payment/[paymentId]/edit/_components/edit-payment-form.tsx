@@ -14,6 +14,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { updatePayment } from "@/lib/actions/payments";
+import {
+  PAYMENT_TYPES,
+  PAYMENT_TYPE_LABELS,
+  hasCoveragePeriod,
+  type PaymentType,
+} from "@/lib/payment-types";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
@@ -27,7 +33,7 @@ interface EditPaymentFormProps {
   };
   initialData: {
     amount: string;
-    paymentType: "monthly" | "bus" | "uniform";
+    paymentType: PaymentType;
     paymentMethod: "cash" | "bank_transfer";
     payerName: string | null;
     notes: string | null;
@@ -54,7 +60,7 @@ export function EditPaymentForm({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  const [paymentType, setPaymentType] = useState<"monthly" | "bus" | "uniform">(initialData.paymentType);
+  const [paymentType, setPaymentType] = useState<PaymentType>(initialData.paymentType);
   const [amount, setAmount] = useState(initialData.amount);
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "bank_transfer">(initialData.paymentMethod);
   const [payerName, setPayerName] = useState(initialData.payerName || "");
@@ -66,13 +72,16 @@ export function EditPaymentForm({
   const coverageDays = coverageFrom && coverageTo ? daysBetween(coverageFrom, coverageTo) : 0;
   const approxMonths = coverageDays > 0 ? Math.round(coverageDays / 30) || 1 : 0;
 
-  const handlePaymentTypeChange = (type: "monthly" | "bus" | "uniform") => {
+  // One-off fees (uniform, activity) are not billed over a coverage period
+  const needsCoverage = hasCoveragePeriod(paymentType);
+
+  const handlePaymentTypeChange = (type: PaymentType) => {
     setPaymentType(type);
     if (type === "monthly" && feeConfig?.monthlyFee) {
       setAmount(feeConfig.monthlyFee);
     } else if (type === "bus" && feeConfig?.busFee) {
       setAmount(feeConfig.busFee);
-    } else if (type === "uniform") {
+    } else if (!hasCoveragePeriod(type)) {
       setCoverageFrom("");
       setCoverageTo("");
     }
@@ -86,12 +95,12 @@ export function EditPaymentForm({
       return;
     }
 
-    if (paymentType !== "uniform" && (!coverageFrom || !coverageTo)) {
+    if (needsCoverage && (!coverageFrom || !coverageTo)) {
       toast.error("يرجى تحديد فترة التغطية");
       return;
     }
 
-    if (paymentType !== "uniform" && coverageTo < coverageFrom) {
+    if (needsCoverage && coverageTo < coverageFrom) {
       toast.error("تاريخ النهاية يجب أن يكون بعد تاريخ البداية");
       return;
     }
@@ -106,8 +115,8 @@ export function EditPaymentForm({
         payerName: payerName || undefined,
         notes: notes || undefined,
         paymentDate,
-        coverageStart: paymentType !== "uniform" ? coverageFrom : undefined,
-        coverageEnd: paymentType !== "uniform" ? coverageTo : undefined,
+        coverageStart: needsCoverage ? coverageFrom : undefined,
+        coverageEnd: needsCoverage ? coverageTo : undefined,
       });
 
       if (result.success) {
@@ -124,14 +133,14 @@ export function EditPaymentForm({
       {/* Payment Type */}
       <div className="grid gap-2">
         <Label>نوع الدفعة *</Label>
-        <Select value={paymentType} onValueChange={(v) => handlePaymentTypeChange(v as "monthly" | "bus" | "uniform")}>
+        <Select value={paymentType} onValueChange={(v) => handlePaymentTypeChange(v as PaymentType)}>
           <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="monthly">اشتراك شهري</SelectItem>
-            <SelectItem value="bus">رسوم الباص</SelectItem>
-            <SelectItem value="uniform">الزي الرسمي</SelectItem>
+            {PAYMENT_TYPES.map((t) => (
+              <SelectItem key={t} value={t}>{PAYMENT_TYPE_LABELS[t]}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -186,7 +195,7 @@ export function EditPaymentForm({
       </div>
 
       {/* Coverage Date Range */}
-      {paymentType !== "uniform" && (
+      {needsCoverage && (
         <div className="grid gap-3">
           <Label>فترة التغطية *</Label>
           <div className="grid grid-cols-2 gap-3">

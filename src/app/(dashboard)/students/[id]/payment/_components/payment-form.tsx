@@ -14,6 +14,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { recordPayment } from "@/lib/actions/payments";
+import {
+  PAYMENT_TYPES,
+  PAYMENT_TYPE_LABELS,
+  hasCoveragePeriod,
+  type PaymentType,
+} from "@/lib/payment-types";
 import { sendPaymentSms } from "@/lib/actions/notifications";
 import { toast } from "sonner";
 import { Loader2, Check, MessageSquare, Users } from "lucide-react";
@@ -57,7 +63,7 @@ export function PaymentForm({ studentId, studentName, registrationDate, lastCove
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   
-  const [paymentType, setPaymentType] = useState<"monthly" | "bus" | "uniform">("monthly");
+  const [paymentType, setPaymentType] = useState<PaymentType>("monthly");
   const [amount, setAmount] = useState(feeConfig?.monthlyFee || "");
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "bank_transfer">("cash");
   const [payerName, setPayerName] = useState("");
@@ -74,7 +80,10 @@ export function PaymentForm({ studentId, studentName, registrationDate, lastCove
   const coverageDays = coverageFrom && coverageTo ? daysBetween(coverageFrom, coverageTo) : 0;
   const approxMonths = coverageDays > 0 ? Math.round(coverageDays / 30) || 1 : 0;
 
-  const handlePaymentTypeChange = (type: "monthly" | "bus" | "uniform") => {
+  // One-off fees (uniform, activity) are not billed over a coverage period
+  const needsCoverage = hasCoveragePeriod(paymentType);
+
+  const handlePaymentTypeChange = (type: PaymentType) => {
     setPaymentType(type);
     if (type === "monthly" && feeConfig?.monthlyFee) {
       setAmount(feeConfig.monthlyFee);
@@ -93,12 +102,12 @@ export function PaymentForm({ studentId, studentName, registrationDate, lastCove
       return;
     }
 
-    if (paymentType !== "uniform" && (!coverageFrom || !coverageTo)) {
+    if (needsCoverage && (!coverageFrom || !coverageTo)) {
       toast.error("يرجى تحديد فترة التغطية");
       return;
     }
 
-    if (paymentType !== "uniform" && coverageTo < coverageFrom) {
+    if (needsCoverage && coverageTo < coverageFrom) {
       toast.error("تاريخ النهاية يجب أن يكون بعد تاريخ البداية");
       return;
     }
@@ -112,8 +121,8 @@ export function PaymentForm({ studentId, studentName, registrationDate, lastCove
         payerName: payerName || undefined,
         notes: notes || undefined,
         paymentDate: new Date().toISOString().split("T")[0],
-        coverageStart: paymentType !== "uniform" ? coverageFrom : undefined,
-        coverageEnd: paymentType !== "uniform" ? coverageTo : undefined,
+        coverageStart: needsCoverage ? coverageFrom : undefined,
+        coverageEnd: needsCoverage ? coverageTo : undefined,
       });
 
       if (result.success) {
@@ -138,8 +147,8 @@ export function PaymentForm({ studentId, studentName, registrationDate, lastCove
             payerName: payerName || undefined,
             notes: notes ? `${notes} (دفعة مشتركة مع ${studentName})` : `دفعة مشتركة مع ${studentName}`,
             paymentDate: new Date().toISOString().split("T")[0],
-            coverageStart: paymentType !== "uniform" ? coverageFrom : undefined,
-            coverageEnd: paymentType !== "uniform" ? coverageTo : undefined,
+            coverageStart: needsCoverage ? coverageFrom : undefined,
+            coverageEnd: needsCoverage ? coverageTo : undefined,
           });
           if (sibResult.success) {
             toast.success(`تم تسجيل الدفعة لـ ${sib.name}`);
@@ -175,14 +184,14 @@ export function PaymentForm({ studentId, studentName, registrationDate, lastCove
       {/* Payment Type */}
       <div className="grid gap-2">
         <Label>نوع الدفعة *</Label>
-        <Select value={paymentType} onValueChange={(v) => handlePaymentTypeChange(v as "monthly" | "bus" | "uniform")}>
+        <Select value={paymentType} onValueChange={(v) => handlePaymentTypeChange(v as PaymentType)}>
           <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="monthly">اشتراك شهري</SelectItem>
-            <SelectItem value="bus">رسوم الباص</SelectItem>
-            <SelectItem value="uniform">الزي الرسمي</SelectItem>
+            {PAYMENT_TYPES.map((t) => (
+              <SelectItem key={t} value={t}>{PAYMENT_TYPE_LABELS[t]}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -224,7 +233,7 @@ export function PaymentForm({ studentId, studentName, registrationDate, lastCove
       </div>
 
       {/* Coverage Date Range */}
-      {paymentType !== "uniform" && (
+      {needsCoverage && (
         <div className="grid gap-3">
           <Label>فترة التغطية *</Label>
           <div className="grid grid-cols-2 gap-3">
@@ -341,7 +350,7 @@ export function PaymentForm({ studentId, studentName, registrationDate, lastCove
               );
             })}
           </div>
-          {alsoPayForSiblings.length > 0 && coverageDays > 0 && (
+          {alsoPayForSiblings.length > 0 && (!needsCoverage || coverageDays > 0) && (
             <div className="p-3 rounded-lg bg-violet-100 border border-violet-200">
               <p className="text-sm text-violet-800 font-medium">
                 ملخص: سيتم تسجيل {alsoPayForSiblings.length + 1} دفعات ({studentName} + {alsoPayForSiblings.length} أخوة)

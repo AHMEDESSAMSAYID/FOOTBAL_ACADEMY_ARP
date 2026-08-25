@@ -8,6 +8,7 @@ import { Pencil, Trash2, Loader2, FileDown } from "lucide-react";
 import { deletePayment } from "@/lib/actions/payments";
 import { generateReceiptPDF } from "@/lib/generate-receipt-pdf";
 import { toast } from "sonner";
+import type { PaymentType } from "@/lib/payment-types";
 
 interface PaymentActionsProps {
   paymentId: string;
@@ -15,7 +16,7 @@ interface PaymentActionsProps {
   studentName: string;
   membershipNumber?: string;
   amount: string;
-  paymentType: "monthly" | "bus" | "uniform";
+  paymentType: PaymentType;
   paymentMethod: "cash" | "bank_transfer";
   payerName?: string | null;
   paymentDate: string;

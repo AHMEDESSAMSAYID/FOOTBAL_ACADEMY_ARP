@@ -1,4 +1,5 @@
 import { db } from "@/db";
+import { paymentTypeLabel } from "@/lib/payment-types";
 import { students, payments, feeConfigs, contacts, uniformRecords } from "@/db/schema";
 import { eq, desc, sql, and } from "drizzle-orm";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -703,9 +704,7 @@ export default async function PaymentsPage({ searchParams }: Props) {
                         {student.name}
                       </Link>
                       <p className="text-sm text-zinc-500">
-                        {payment.paymentType === "monthly" && "اشتراك شهري"}
-                        {payment.paymentType === "bus" && "رسوم الباص"}
-                        {payment.paymentType === "uniform" && "الزي الرسمي"}
+                        {paymentTypeLabel(payment.paymentType)}
                         {" • "}
                         {payment.paymentDate}
                       </p>
